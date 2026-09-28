@@ -216,10 +216,16 @@ export class TableScene {
     return this.flat(dx * 0.95 + j * 0.15, 0.03 + order * 0.018, dz * 0.95 + j * 0.1, YAWS[rel] + j * 0.25, true);
   }
 
+  // Stichhaufen liegt vor seinem Besitzer, leicht rechts (spiegelbildlich zum Geber-Chip links) – nicht in der Filzecke,
+  // wo er zwischen zwei Spielern nicht zuzuordnen wäre.
   pileSlot(rel, i) {
     const [dx, dz] = DIRS[rel], [rx, rz] = RIGHT[rel];
     const j = hash(`p${rel}-${Math.floor(i / 4)}`) - 0.5;
-    return this.flat(dx * 3.3 + rx * 3.3 + j * 0.12, 0.02 + i * 0.012, dz * 3.3 + rz * 3.3, YAWS[rel] + Math.PI / 2 + j * 0.3, false);
+    // eigener Stapel weiter rechts (Platz für Hinweis/Ansage-Knöpfe); im Hochformat rückt der linke Nachbar unter seine Plakette weg
+    const portrait = this.camera.aspect < 1;
+    const side = (rel === 0 ? 3.2 : rel === 1 && portrait ? 3.1 : 2.2) + j * 0.12;
+    const front = rel === 0 && portrait ? 3.3 : 3.7; // Hochformat: eigener Stapel etwas höher, über der Aktionsleiste
+    return this.flat(dx * front + rx * side, 0.02 + i * 0.012, dz * front + rz * side, YAWS[rel] + Math.PI / 2 + j * 0.3, false);
   }
 
   oppSlot(rel, i, n) {

@@ -3,7 +3,7 @@ import { TableScene } from './table.js';
 import { createNet } from './net.js';
 import { RTC } from './rtc.js';
 import { playSound, isMuted, setMuted, unlockAudio } from './sound.js';
-import { getCardDataURL, getIndexStyle, setIndexStyle } from './cardart.js';
+import { getCardDataURL } from './cardart.js';
 import { RULE_DEFS, PRESETS, applyPreset } from '/shared/rules.js';
 import { announceLabel, cardName, keyOf, LEVEL_LABELS } from '/shared/cards.js';
 
@@ -274,8 +274,12 @@ function renderLastTrickButton() {
 function positionLastTrickButton() {
   const btn = $('#last-trick');
   if (btn.classList.contains('hidden')) return;
-  // Querformat: rechts neben der Stichmitte; Hochformat (schmal): über der Stichmitte, wo seitlich die Plaketten sitzen
-  const p = window.innerWidth / window.innerHeight < 1 ? table.toScreen(0, 0.05, -2.9) : table.toScreen(3.2, 0.05, 1.1);
+  // Hochformat: auf dem Filz ist kein Platz frei (Plaketten, Stichhaufen) -> unten rechts neben der eigenen Plakette andocken
+  const docked = window.innerWidth / window.innerHeight < 1;
+  btn.classList.toggle('docked', docked);
+  if (docked) { btn.style.left = ''; btn.style.top = ''; return; }
+  // Querformat: auf dem Tisch rechts neben der Stichmitte
+  const p = table.toScreen(3.2, 0.05, 1.1);
   btn.style.left = `${Math.max(70, Math.min(window.innerWidth - 70, p.x))}px`;
   btn.style.top = `${p.y}px`;
 }
@@ -295,7 +299,9 @@ function positionBadges() {
     if (rel !== 0) {
       const p = table.seatAnchor(rel);
       if (p) {
-        const x = Math.max(70, Math.min(w - 70, p.x));
+        // an der tatsächlichen Breite klemmen, damit die Plakette bis an den Rand rücken kann (Hochformat: mehr Filz frei)
+        const half = b.offsetWidth / 2 + 6;
+        const x = Math.max(half, Math.min(w - half, p.x));
         const y = Math.max(rel === 2 ? 118 : 90, Math.min(h * 0.6, p.y));
         b.style.left = `${x}px`;
         b.style.top = `${y}px`;
@@ -657,7 +663,6 @@ function menuHtml() {
   return `<div class="dialog narrow"><div class="result-head"><h2>Menü</h2><button class="x" data-act="closeModal">×</button></div>
     <div class="menu-list">
       <button class="btn" data-act="rename">✏️ Name ändern</button>
-      <button class="btn" data-act="indices" title="Beschriftung von Bube, Dame, König in den Kartenecken">🂫 Kartenecken: ${getIndexStyle() === 'de' ? 'B · D · K' : 'J · Q · K'} (umschalten)</button>
       <button class="btn" data-act="fullscreen">⛶ Vollbild</button>
       <button class="btn" data-act="copy">🔗 Einladungslink kopieren</button>
       ${st.me.seat != null ? '<button class="btn" data-act="leaveSeat">🚶 Aufstehen (Bot übernimmt)</button>' : ''}
@@ -716,7 +721,6 @@ $('#modal').addEventListener('click', async (e) => {
       break;
     }
     case 'fullscreen': toggleFullscreen(); closeModal(); break;
-    case 'indices': setIndexStyle(getIndexStyle() === 'de' ? 'en' : 'de'); S.actionHtml = ''; renderActionBar(); renderModal(); break;
     case 'copy': copyLink(); break;
     case 'leaveSeat':
       if (confirm('Aufstehen? Ein Bot spielt für dich weiter.')) net.send({ t: 'leaveSeat' });

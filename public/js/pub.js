@@ -204,7 +204,7 @@ export function buildPub(scene) {
     pub.add(c);
   }
 
-  // ---------- Bier auf Bierdeckeln (an den Tischecken) ----------
+  // ---------- Bier auf Bierdeckeln (Deko auf der Theke; der Spieltisch bleibt frei) ----------
   const coasterTex = canvasTex(256, 256, (ctx, w) => {
     ctx.fillStyle = '#f4ecd8'; ctx.beginPath(); ctx.arc(w / 2, w / 2, w / 2 - 2, 0, Math.PI * 2); ctx.fill();
     ctx.strokeStyle = '#a3202c'; ctx.lineWidth = 12; ctx.beginPath(); ctx.arc(w / 2, w / 2, w / 2 - 16, 0, Math.PI * 2); ctx.stroke();
@@ -243,12 +243,6 @@ export function buildPub(scene) {
     g.add(foam);
     return g;
   };
-  // nur an den hinteren Ecken, damit vorne nichts die eigenen Karten verdeckt
-  [[-1, -1, 0.85], [1, -1, 0.5]].forEach(([x, z, f]) => {
-    const b = makeBeer(f);
-    b.position.set(x * (TABLE_HALF - 0.75), 0, z * (TABLE_HALF - 0.75));
-    pub.add(b);
-  });
 
   // ---------- Theke ----------
   const bar = new THREE.Group();

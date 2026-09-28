@@ -68,7 +68,7 @@ Die stille Hochzeit wird automatisch erkannt und wie ein Solo abgerechnet.
 ## Kartenbilder
 
 Vorderseiten: das klassische „English pattern“-Blatt von Dmitry Fomin (Wikimedia Commons, CC0/gemeinfrei),
-standardmäßig mit deutschen Eck-Indizes B/D/K (im Menü auf J/Q/K umschaltbar). Die Rückseite ist ein eigenes,
+mit deutschen Eck-Indizes B/D/K statt J/Q/K. Die Rückseite ist ein eigenes,
 mit Nano Banana generiertes Motiv. Details: [public/cards/CREDITS.md](public/cards/CREDITS.md).
 
 ## Bedienung
