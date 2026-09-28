@@ -235,6 +235,12 @@ export class TableScene {
   }
 
   handSlot(i, n, raised) {
+    const { local, quat, scale } = this.handSlotLocal(i, n, raised);
+    return { pos: this.camera.localToWorld(local), quat: this.camera.quaternion.clone().multiply(quat), scale };
+  }
+
+  // Position/Drehung eines Handplatzes im Kamera-Koordinatensystem
+  handSlotLocal(i, n, raised) {
     const cam = this.camera;
     const halfH = Math.tan(THREE.MathUtils.degToRad(cam.fov / 2)) * HAND_DIST;
     const halfW = halfH * cam.aspect;
@@ -246,11 +252,51 @@ export class TableScene {
     const x = (i - (n - 1) / 2) * spacing;
     let y = -halfH + CH * scale * 0.47 - t * t * 0.5 * scale;
     if (raised) y += 0.42 * scale;
-    _v.set(x, y, -HAND_DIST + i * 0.012);
-    const pos = cam.localToWorld(_v.clone());
+    const local = new THREE.Vector3(x, y, -HAND_DIST + i * 0.012);
     _e.set(-0.08, 0, -t * 0.22 * Math.min(1, n / 8), 'XYZ');
-    const quat = cam.quaternion.clone().multiply(_q.setFromEuler(_e));
-    return { pos, quat, scale };
+    const quat = new THREE.Quaternion().setFromEuler(_e);
+    return { local, quat, scale, height: CH * scale };
+  }
+
+  // Karte in die eigene Hand fliegen lassen, ohne durch andere Karten zu clippen:
+  // 1) vom Tisch zu einem Punkt über ihrem Handplatz, genau in ihrer Endtiefe; die Drehung ist schon vorher fertig.
+  // 2) parallel zu den Nachbarn senkrecht nach unten auf den Platz rutschen (parallele Ebenen schneiden sich nie).
+  // Ausgeteilt wird von rechts nach links: jede neue Karte liegt hinter den schon liegenden rechts von ihr.
+  animateToHand(obj, id, delay) {
+    const cam = this.camera;
+    const p0 = cam.worldToLocal(obj.group.position.clone());
+    const q0 = obj.group.quaternion.clone();
+    const s0 = obj.group.scale.x;
+    const ease = (x) => (x < 0.5 ? 4 * x * x * x : 1 - (-2 * x + 2) ** 3 / 2);
+    const easeOut = (x) => 1 - (1 - x) ** 3;
+    const p = new THREE.Vector3(), q = new THREE.Quaternion();
+    obj.wait = 0;
+    obj.anim = {
+      t: -delay,
+      dur: 0.8,
+      apply: (t) => {
+        const n = Math.max(1, this.handOrder.length);
+        const i = Math.max(0, this.handOrder.indexOf(id));
+        const slot = this.handSlotLocal(i, n, false);
+        const slotQ = cam.quaternion.clone().multiply(slot.quat);
+        // entlang der eigenen (leicht gekippten und gefächerten) Kartenachse versetzt – so bleibt Phase 2 exakt in der Endebene
+        const above = slot.local.clone().add(new THREE.Vector3(0, slot.height * 1.4, 0).applyQuaternion(slot.quat));
+        const g = obj.group;
+        if (t < 0.6) {
+          const e = ease(t / 0.6);
+          p.lerpVectors(p0, above, e);
+          q.slerpQuaternions(q0, slotQ, Math.min(1, e / 0.7));
+          g.scale.setScalar(s0 + (slot.scale - s0) * e);
+        } else {
+          const e = easeOut((t - 0.6) / 0.4);
+          p.lerpVectors(above, slot.local, e);
+          q.copy(slotQ);
+          g.scale.setScalar(slot.scale);
+        }
+        g.position.copy(cam.localToWorld(p));
+        g.quaternion.copy(q);
+      },
+    };
   }
 
   setTarget(obj, tr, speed) {
@@ -301,6 +347,7 @@ export class TableScene {
       let obj = this.hand.get(p.card);
       if (obj) {
         this.hand.delete(p.card);
+        obj.anim = null;
         if (obj.proxy) { this.scene.remove(obj.proxy); obj.proxy = null; }
         obj.frontMat.color.set(0xffffff);
       } else {
@@ -323,17 +370,22 @@ export class TableScene {
     for (const [id, obj] of [...this.hand]) {
       if (inHand.has(id)) continue;
       this.hand.delete(id);
+      obj.anim = null;
       if (obj.proxy) { this.scene.remove(obj.proxy); obj.proxy = null; }
       const dest = armutOther != null ? this.seatSpot(armutOther) : spawnDeal;
       this.setTarget(obj, { pos: dest.pos, quat: this.flat(0, 0, 0, 0, false).quat, scale: 0.8 }, 6);
       this.flying.push(obj);
     }
-    handIds.forEach((id, i) => {
-      if (this.hand.has(id)) return;
-      const src = !fresh && armutOther != null ? this.seatSpot(armutOther) : spawnDeal;
+    // Neue Karten starten als kleiner Stapel (nicht deckungsgleich ineinander); die oberste = rechteste fliegt zuerst.
+    const newIds = handIds.filter((id) => !this.hand.has(id));
+    const base = !fresh && armutOther != null ? this.seatSpot(armutOther) : spawnDeal;
+    const stackNormal = new THREE.Vector3(0, 0, 1).applyQuaternion(base.quat).negate(); // Rückseite zeigt nach oben
+    newIds.forEach((id, idx) => {
+      const k = newIds.length - 1 - idx; // Abflug-Reihenfolge: 0 = ganz rechts
+      const src = { pos: base.pos.clone().addScaledVector(stackNormal, (newIds.length - 1 - k) * 0.012), quat: base.quat, scale: base.scale };
       const obj = this.makeCard(id, src);
-      obj.wait = fresh ? 0.25 + i * 0.06 : 0.1;
       obj.speed = 7;
+      this.animateToHand(obj, id, fresh ? 0.25 + k * 0.07 : 0.1 + k * 0.12);
       const proxy = new THREE.Mesh(this.proxyGeo, this.proxyMat);
       proxy.userData.id = id;
       this.scene.add(proxy);
@@ -543,12 +595,14 @@ export class TableScene {
       if (obj.anim) {
         const a = obj.anim;
         a.t = Math.min(a.dur, a.t + dt);
+        if (a.t < 0) continue; // Verzögerung: Karte wartet noch am Startpunkt
         a.apply(a.t / a.dur);
         if (a.t >= a.dur) {
           obj.anim = null;
+          if (obj.proxy) continue; // Handkarte: Ziel kommt weiterhin aus layoutHand (z.B. Anheben beim Hovern)
           obj.tPos.copy(obj.group.position);
           obj.tQuat.copy(obj.group.quaternion);
-          obj.tScale = 1;
+          obj.tScale = obj.group.scale.x;
         }
         continue;
       }
