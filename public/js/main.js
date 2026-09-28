@@ -274,8 +274,12 @@ function renderLastTrickButton() {
 function positionLastTrickButton() {
   const btn = $('#last-trick');
   if (btn.classList.contains('hidden')) return;
-  // Querformat: rechts neben der Stichmitte; Hochformat (schmal): über der Stichmitte, wo seitlich die Plaketten sitzen
-  const p = window.innerWidth / window.innerHeight < 1 ? table.toScreen(0, 0.05, -2.9) : table.toScreen(3.2, 0.05, 1.1);
+  // Hochformat: auf dem Filz ist kein Platz frei (Plaketten, Stichhaufen) -> unten rechts neben der eigenen Plakette andocken
+  const docked = window.innerWidth / window.innerHeight < 1;
+  btn.classList.toggle('docked', docked);
+  if (docked) { btn.style.left = ''; btn.style.top = ''; return; }
+  // Querformat: auf dem Tisch rechts neben der Stichmitte
+  const p = table.toScreen(3.2, 0.05, 1.1);
   btn.style.left = `${Math.max(70, Math.min(window.innerWidth - 70, p.x))}px`;
   btn.style.top = `${p.y}px`;
 }
@@ -295,7 +299,9 @@ function positionBadges() {
     if (rel !== 0) {
       const p = table.seatAnchor(rel);
       if (p) {
-        const x = Math.max(70, Math.min(w - 70, p.x));
+        // an der tatsächlichen Breite klemmen, damit die Plakette bis an den Rand rücken kann (Hochformat: mehr Filz frei)
+        const half = b.offsetWidth / 2 + 6;
+        const x = Math.max(half, Math.min(w - half, p.x));
         const y = Math.max(rel === 2 ? 118 : 90, Math.min(h * 0.6, p.y));
         b.style.left = `${x}px`;
         b.style.top = `${y}px`;
