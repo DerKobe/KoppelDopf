@@ -37,6 +37,21 @@ Standardmäßig werden öffentliche STUN-Server genutzt. Hängt jemand hinter ei
 ICE_SERVERS='[{"urls":"stun:stun.l.google.com:19302"},{"urls":"turn:turn.example.org:3478","username":"u","credential":"p"}]' npm start
 ```
 
+## Deployment mit Dokku
+
+Das Repo enthält ein `Dockerfile` (Node 22, nur Laufzeit-Abhängigkeiten, Port 3000). Dokku erkennt es
+automatisch und baut damit statt mit Herokuish/Buildpacks.
+
+```bash
+dokku apps:create koppeldopf
+dokku proxy:ports-set koppeldopf http:80:3000
+dokku domains:set koppeldopf koppeldopf.example.org
+git push dokku master
+dokku letsencrypt:enable koppeldopf   # HTTPS – nötig für Kamera/Mikrofon
+```
+
+WebSockets laufen über Dokkus nginx ohne weitere Konfiguration.
+
 ## Sonderregeln (in der Lobby wählbar)
 
 | Bereich | Regeln |
