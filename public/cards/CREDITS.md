@@ -7,7 +7,7 @@ Klassisches „English pattern“-Blatt von **Dmitry Fomin**, von Wikimedia Comm
 
 Lizenz: **CC0 1.0** (gemeinfrei) – freie Nutzung ohne Namensnennungspflicht.
 Die Dateien sind unverändert. Die deutschen Eck-Indizes (B/D/K statt J/Q/K) werden erst im Browser
-beim Rastern darübergelegt (`public/js/cardart.js`) und lassen sich im Spielmenü abschalten.
+beim Rastern darübergelegt (`public/js/cardart.js`), exakt an der Position der Original-Buchstaben.
 
 ## Rückseite (`back.jpg`)
 
