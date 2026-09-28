@@ -3,7 +3,7 @@ import { TableScene } from './table.js';
 import { createNet } from './net.js';
 import { RTC } from './rtc.js';
 import { playSound, isMuted, setMuted, unlockAudio } from './sound.js';
-import { getCardDataURL } from './cardart.js';
+import { getCardDataURL, getIndexStyle, setIndexStyle } from './cardart.js';
 import { RULE_DEFS, PRESETS, applyPreset } from '/shared/rules.js';
 import { announceLabel, cardName, keyOf, LEVEL_LABELS } from '/shared/cards.js';
 
@@ -98,6 +98,10 @@ const table = new TableScene($('#scene'), {
   getSelectMode: () => selectMode(),
   onEvent: (kind) => playSound(kind),
   onFrame: () => positionBadges(),
+  onDealDone: () => {
+    renderActionBar();
+    if (S.turnSoundAfterDeal) { S.turnSoundAfterDeal = false; if (S.lastTurnMine) playSound('turn'); }
+  },
 });
 table.pub.setChalkboard('Stammtisch', [['Heute:', 'Doko'], ['Bier:', '2,80'], ['Korn:', '1,50']]);
 
@@ -137,7 +141,11 @@ function onState() {
       table.setSelection(S.selection);
     }
     const mine = me != null && r.turn === me && ['playing', 'reservation', 'armutGive', 'armutOffer', 'armutReturn'].includes(r.phase) && !(r.trick && r.trick.plays.length === 4);
-    if (mine && !S.lastTurnMine && !S.firstState) playSound('turn');
+    if (mine && !S.lastTurnMine && !S.firstState) {
+      // Während die Karten noch einfliegen, ertönt der Hinweis erst zusammen mit dem Panel
+      if (table.isDealing()) S.turnSoundAfterDeal = true;
+      else playSound('turn');
+    }
     S.lastTurnMine = mine;
     if (r.phase === 'done' && S.resultSound !== r.id && !S.firstState) {
       S.resultSound = r.id;
@@ -348,19 +356,20 @@ function renderSpectators() {
 function renderActionBar() {
   const st = S.state, r = st?.round, me = st?.me.seat;
   let html = '';
-  if (r && st.match) {
+  // Solange die Karten noch in die Hand fliegen, bleibt die Leiste leer (sie erscheint danach per Fade-in)
+  if (r && st.match && !table.isDealing()) {
     const turnName = r.turn != null ? esc(seatName(r.turn)) : '';
     switch (r.phase) {
       case 'reservation':
         if (r.turn === me) {
           const opts = r.reservationOptions;
           if (S.pendingSolo) {
-            html = `<div class="box panel"><div class="prompt">Wirklich <b>${esc(RES_LABELS[S.pendingSolo])}</b> spielen?</div>
+            html = `<div class="box panel" data-panel="soloConfirm"><div class="prompt">Wirklich <b>${esc(RES_LABELS[S.pendingSolo])}</b> spielen?</div>
               <div class="row"><button class="btn primary" data-res="${S.pendingSolo}">Ja, ${esc(RES_LABELS[S.pendingSolo])}!</button><button class="btn ghost" data-act="cancelSolo">Zurück</button></div></div>`;
           } else {
             const main = opts.filter((o) => !o.startsWith('solo_'));
             const solos = opts.filter((o) => o.startsWith('solo_'));
-            html = `<div class="box panel"><div class="prompt">Hast du einen Vorbehalt?</div>
+            html = `<div class="box panel" data-panel="reservation"><div class="prompt">Hast du einen Vorbehalt?</div>
               <div class="row">${main.map((o) => `<button class="btn ${o === 'gesund' ? 'primary' : ''}" data-res="${o}">${RES_LABELS[o]}</button>`).join('')}</div>
               ${solos.length ? `<div class="sub" style="margin:10px 0 6px">Solo ansagen:</div><div class="row">${solos.map((o) => `<button class="btn small" data-solo="${o}">${RES_LABELS[o]}</button>`).join('')}</div>` : ''}</div>`;
           }
@@ -370,14 +379,14 @@ function renderActionBar() {
         if (r.armut.poor === me) {
           const must = r.armut.mustGive || [];
           const ok = S.selection.length === 3 && must.every((c) => S.selection.includes(c));
-          html = `<div class="box panel"><div class="prompt">Armut: Wähle 3 Karten zum Abgeben</div>
+          html = `<div class="box panel" data-panel="armutGive"><div class="prompt">Armut: Wähle 3 Karten zum Abgeben</div>
             <div class="sub">Alle Trümpfe (${must.length}) müssen dabei sein. Klicke Karten an, um sie auszuwählen. (${S.selection.length}/3)</div>
             <div class="row"><button class="btn primary" data-act="armutGive" ${ok ? '' : 'disabled'}>Karten abgeben</button></div></div>`;
         } else html = `<div class="waiting">${esc(seatName(r.armut.poor))} hat eine Armut und wählt Karten…</div>`;
         break;
       case 'armutOffer':
         if (r.turn === me) {
-          html = `<div class="box panel"><div class="prompt">${esc(seatName(r.armut.poor))} hat eine Armut mit <b>${r.armut.gaveTrumps}</b> Trumpf${r.armut.gaveTrumps === 1 ? '' : 'en'}.</div>
+          html = `<div class="box panel" data-panel="armutOffer"><div class="prompt">${esc(seatName(r.armut.poor))} hat eine Armut mit <b>${r.armut.gaveTrumps}</b> Trumpf${r.armut.gaveTrumps === 1 ? '' : 'en'}.</div>
             <div class="sub">Nimmst du sie mit? Ihr spielt dann zusammen als Re.</div>
             <div class="row"><button class="btn primary" data-act="armutYes">Mitnehmen</button><button class="btn" data-act="armutNo">Nein, danke</button></div></div>`;
         } else html = `<div class="waiting">Wer nimmt die Armut? ${turnName} überlegt…</div>`;
@@ -385,7 +394,7 @@ function renderActionBar() {
       case 'armutReturn':
         if (r.armut.rich === me) {
           const rec = r.armut.received || [];
-          html = `<div class="box panel"><div class="prompt">Gib 3 Karten an ${esc(seatName(r.armut.poor))} zurück (${S.selection.length}/3)</div>
+          html = `<div class="box panel" data-panel="armutReturn"><div class="prompt">Gib 3 Karten an ${esc(seatName(r.armut.poor))} zurück (${S.selection.length}/3)</div>
             <div class="sub">Erhalten:</div><div class="minicards">${rec.map((c) => `<img src="${getCardDataURL(keyOf(c))}" alt="${esc(cardName(c))}" title="${esc(cardName(c))}">`).join('')}</div>
             <div class="row"><button class="btn primary" data-act="armutReturn" ${S.selection.length === 3 ? '' : 'disabled'}>Zurückgeben</button></div></div>`;
         } else html = `<div class="waiting">${turnName} sortiert die Armut…</div>`;
@@ -407,7 +416,15 @@ function renderActionBar() {
   } else if (st?.match && me == null) {
     html = '<div class="waiting">Du schaust zu. Übernimm einen Bot-Platz, um mitzuspielen.</div>';
   }
-  if (html !== S.actionHtml) { S.actionHtml = html; $('#actionbar').innerHTML = html; }
+  if (html !== S.actionHtml) {
+    const bar = $('#actionbar');
+    const prevPanel = bar.querySelector('.box')?.dataset.panel;
+    S.actionHtml = html;
+    bar.innerHTML = html;
+    // Nur ein neu erscheinendes Panel blendet ein – nicht bei jeder Aktualisierung (z.B. Zähler bei der Armut)
+    const box = bar.querySelector('.box');
+    if (box && box.dataset.panel === prevPanel) box.classList.add('still');
+  }
 }
 
 $('#actionbar').addEventListener('click', (e) => {
@@ -611,6 +628,7 @@ function menuHtml() {
   return `<div class="dialog narrow"><div class="result-head"><h2>Menü</h2><button class="x" data-act="closeModal">×</button></div>
     <div class="menu-list">
       <button class="btn" data-act="rename">✏️ Name ändern</button>
+      <button class="btn" data-act="indices" title="Beschriftung von Bube, Dame, König in den Kartenecken">🂫 Kartenecken: ${getIndexStyle() === 'de' ? 'B · D · K' : 'J · Q · K'} (umschalten)</button>
       <button class="btn" data-act="fullscreen">⛶ Vollbild</button>
       <button class="btn" data-act="copy">🔗 Einladungslink kopieren</button>
       ${st.me.seat != null ? '<button class="btn" data-act="leaveSeat">🚶 Aufstehen (Bot übernimmt)</button>' : ''}
@@ -669,6 +687,7 @@ $('#modal').addEventListener('click', async (e) => {
       break;
     }
     case 'fullscreen': toggleFullscreen(); closeModal(); break;
+    case 'indices': setIndexStyle(getIndexStyle() === 'de' ? 'en' : 'de'); S.actionHtml = ''; renderActionBar(); renderModal(); break;
     case 'copy': copyLink(); break;
     case 'leaveSeat':
       if (confirm('Aufstehen? Ein Bot spielt für dich weiter.')) net.send({ t: 'leaveSeat' });

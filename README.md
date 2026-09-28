@@ -50,6 +50,12 @@ ICE_SERVERS='[{"urls":"stun:stun.l.google.com:19302"},{"urls":"turn:turn.example
 Voreinstellungen: *Kneipenrunde*, *DDV-Turnier*, *Alles an*, *Einsteiger*.
 Die stille Hochzeit wird automatisch erkannt und wie ein Solo abgerechnet.
 
+## Kartenbilder
+
+Vorderseiten: das klassische „English pattern“-Blatt von Dmitry Fomin (Wikimedia Commons, CC0/gemeinfrei),
+standardmäßig mit deutschen Eck-Indizes B/D/K (im Menü auf J/Q/K umschaltbar). Die Rückseite ist ein eigenes,
+mit Nano Banana generiertes Motiv. Details: [public/cards/CREDITS.md](public/cards/CREDITS.md).
+
 ## Bedienung
 
 - **Karte spielen:** anklicken (Touch: antippen zum Anheben, nochmal antippen zum Spielen). Nicht erlaubte Karten sind abgedunkelt.
@@ -68,6 +74,7 @@ server/bot.js     Heuristik-Bots
 shared/cards.js   Karten, Trumpfreihenfolgen, Bedienpflicht, Stichgewinner (Server + Client)
 shared/rules.js   Regeldefinitionen und Presets
 public/js/        three.js-Szene (table.js, pub.js, cardart.js), UI (main.js), WebRTC (rtc.js)
+public/cards/     Kartenbilder (SVG-Vorderseiten, Rückseite) + Herkunft/Lizenz
 test/sim.js       Regeltests + Simulation tausender Bot-Spiele mit Invarianten-Prüfung
 ```
 
