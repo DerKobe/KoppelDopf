@@ -35,6 +35,20 @@ function hash(str) {
 }
 
 const texKey = (id) => id.slice(0, -1); // Karten-ID 'CQa' -> Motiv 'CQ'
+
+// Karten leuchten aus ihrer eigenen Textur (farbtreu, am Tone-Mapping vorbei); die Szenenbeleuchtung trägt nur
+// einen kleinen Anteil bei. Sonst wären Karten unter der hellen Tischlampe überstrahlt und in der Hand
+// (außerhalb des Lichtkegels, fast senkrecht zum Licht) viel zu dunkel.
+const CARD_GLOW = 0.82;
+const CARD_LIT = 0.02;
+const TINT = { normal: 0xffffff, dimmed: 0x9a9a9a, selected: 0xffe6b0 };
+// Lambert = rein diffus: mattes Kartenpapier ohne Glanzlicht der Lampe (das würde die Farben in der Tischmitte ausbleichen)
+function cardMaterial(map) {
+  return new THREE.MeshLambertMaterial({
+    map, emissiveMap: map, emissive: TINT.normal, emissiveIntensity: CARD_GLOW,
+    color: new THREE.Color().setScalar(CARD_LIT), toneMapped: false,
+  });
+}
 const _e = new THREE.Euler();
 const _v = new THREE.Vector3();
 const _q = new THREE.Quaternion();
@@ -58,8 +72,7 @@ export class TableScene {
     this.pub = buildPub(this.scene);
 
     this.cardGeo = roundedCardGeometry();
-    // abgedunkelt und leicht kühl getönt: sonst kippt das Weinrot unter der warmen, hellen Tischlampe ins Terrakotta
-    this.backMat = new THREE.MeshStandardMaterial({ map: getCardTexture('back'), roughness: 0.55, color: new THREE.Color(0.3, 0.22, 0.36) });
+    this.backMat = cardMaterial(getCardTexture('back'));
     this.proxyMat = new THREE.MeshBasicMaterial({ visible: false, side: THREE.DoubleSide });
     this.proxyGeo = new THREE.PlaneGeometry(CW, CH + 0.5);
 
@@ -150,7 +163,7 @@ export class TableScene {
   // ---------- Karten-Objekte ----------
   makeCard(key, spawn) {
     const group = new THREE.Group();
-    const frontMat = new THREE.MeshStandardMaterial({ roughness: 0.55, map: key ? getCardTexture(texKey(key)) : null, color: 0xffffff });
+    const frontMat = cardMaterial(key ? getCardTexture(texKey(key)) : null);
     const front = new THREE.Mesh(this.cardGeo, key ? frontMat : this.backMat);
     front.position.z = 0.003;
     const back = new THREE.Mesh(this.cardGeo, this.backMat);
@@ -168,7 +181,7 @@ export class TableScene {
   setFace(obj, key) {
     if (obj.key === key) return;
     obj.key = key;
-    obj.frontMat.map = getCardTexture(texKey(key));
+    obj.frontMat.map = obj.frontMat.emissiveMap = getCardTexture(texKey(key));
     obj.frontMat.needsUpdate = true;
     obj.front.material = obj.frontMat;
   }
@@ -349,7 +362,7 @@ export class TableScene {
         this.hand.delete(p.card);
         obj.anim = null;
         if (obj.proxy) { this.scene.remove(obj.proxy); obj.proxy = null; }
-        obj.frontMat.color.set(0xffffff);
+        obj.frontMat.emissive.set(TINT.normal);
       } else {
         const rr = this.rel(p.seat);
         const back = this.opp[rr].pop();
@@ -478,8 +491,7 @@ export class TableScene {
       obj.proxy.translateY(0.25);
       obj.proxy.updateMatrixWorld();
       const dim = this.myTurn && !this.playable.has(id) && !this.selectMode;
-      obj.frontMat.color.set(dim ? 0x6a6a6a : this.selected.has(id) ? 0xfff0c0 : 0xffffff);
-      obj.frontMat.emissive.set(this.selected.has(id) ? 0x3a2a00 : 0x000000);
+      obj.frontMat.emissive.set(dim ? TINT.dimmed : this.selected.has(id) ? TINT.selected : TINT.normal);
     });
   }
 
@@ -539,7 +551,12 @@ export class TableScene {
     const anchors = [null, [-7.6, 2.4, -0.4], [0, 3.6, -7.4], [7.6, 2.4, -0.4]];
     const a = anchors[rel];
     if (!a) return null;
-    _v.set(...a).project(this.camera);
+    return this.toScreen(...a);
+  }
+
+  // Bildschirmposition (CSS-Pixel) eines Punkts in der Szene
+  toScreen(x, y, z) {
+    _v.set(x, y, z).project(this.camera);
     const rect = this.renderer.domElement.getBoundingClientRect();
     return { x: (_v.x * 0.5 + 0.5) * rect.width, y: (-_v.y * 0.5 + 0.5) * rect.height };
   }

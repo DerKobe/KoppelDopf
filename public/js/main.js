@@ -161,6 +161,7 @@ function onState() {
   renderActionBar();
   renderModal();
   renderSpectators();
+  renderLastTrickButton();
   renderToolbar();
   updateChalkboard();
 }
@@ -252,8 +253,36 @@ $('#badges').addEventListener('click', (e) => {
 });
 
 let lastLevelCheck = 0;
+// „Letzter Stich“ gehört zum Spiel: Schaltfläche direkt auf dem Tisch, rechts neben der Stichmitte
+function renderLastTrickButton() {
+  const r = S.state?.round;
+  const lt = r?.lastTrick;
+  const btn = $('#last-trick');
+  const show = !!(S.state?.match && lt && (r.phase === 'playing' || r.phase === 'done'));
+  btn.classList.toggle('hidden', !show);
+  if (!show) { S.lastTrickNo = null; return; }
+  btn.querySelector('small').textContent = `an ${seatName(lt.winner)}`;
+  if (S.lastTrickNo != null && S.lastTrickNo !== r.trickNo) {
+    btn.classList.remove('bump');
+    void btn.offsetWidth; // Animation neu starten
+    btn.classList.add('bump');
+  }
+  S.lastTrickNo = r.trickNo;
+  positionLastTrickButton();
+}
+
+function positionLastTrickButton() {
+  const btn = $('#last-trick');
+  if (btn.classList.contains('hidden')) return;
+  // Querformat: rechts neben der Stichmitte; Hochformat (schmal): über der Stichmitte, wo seitlich die Plaketten sitzen
+  const p = window.innerWidth / window.innerHeight < 1 ? table.toScreen(0, 0.05, -2.9) : table.toScreen(3.2, 0.05, 1.1);
+  btn.style.left = `${Math.max(70, Math.min(window.innerWidth - 70, p.x))}px`;
+  btn.style.top = `${p.y}px`;
+}
+
 function positionBadges() {
   const st = S.state;
+  positionLastTrickButton();
   if (!st?.match) return;
   const w = window.innerWidth, h = window.innerHeight;
   const now = performance.now();
@@ -713,7 +742,7 @@ function renderToolbar() {
   $('#btn-sound').textContent = isMuted() ? '🔈' : '🔊';
   $('#btn-sound').classList.toggle('off', isMuted());
   const inGame = !!S.state?.match;
-  for (const id of ['#btn-last', '#btn-score', '#btn-rules', '#btn-menu']) $(id).classList.toggle('hidden', !inGame);
+  for (const id of ['#btn-score', '#btn-rules', '#btn-menu']) $(id).classList.toggle('hidden', !inGame);
   $('#toolbar').classList.toggle('hidden', !S.joined);
 }
 
@@ -730,7 +759,7 @@ async function toggleMedia() {
 $('#btn-media').addEventListener('click', toggleMedia);
 $('#btn-mic').addEventListener('click', () => rtc.setMic(!rtc.micOn));
 $('#btn-cam').addEventListener('click', async () => { try { await rtc.setCam(!rtc.camOn); } catch (e) { toast('Kamera nicht verfügbar.', 'err'); } });
-$('#btn-last').addEventListener('click', () => openModal('last'));
+$('#last-trick').addEventListener('click', () => openModal('last'));
 $('#btn-score').addEventListener('click', () => openModal('score'));
 $('#btn-rules').addEventListener('click', () => openModal('rules'));
 $('#btn-menu').addEventListener('click', () => openModal('menu'));

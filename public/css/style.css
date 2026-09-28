@@ -83,12 +83,23 @@ button { font: inherit; color: inherit; }
 .mediaicons { position: absolute; bottom: 4px; right: 5px; font-size: 12px; display: flex; gap: 2px; text-shadow: 0 1px 2px #000; }
 .badge .take { margin-top: 3px; }
 
+/* „Letzter Stich“ – liegt auf dem Tisch neben der Stichmitte */
+.table-btn { position: absolute; z-index: 4; transform: translate(-50%, -50%); white-space: nowrap; display: inline-flex; align-items: center; gap: 8px; padding: 7px 14px 7px 10px; border-radius: 12px; background: var(--panel); border: 1px solid var(--gold-2); color: var(--text); cursor: pointer; box-shadow: 0 6px 18px rgba(0,0,0,.45); transition: border-color .15s, box-shadow .15s, transform .15s; }
+.table-btn:hover { border-color: var(--gold); box-shadow: 0 0 0 2px rgba(231,183,90,.3), 0 6px 18px rgba(0,0,0,.45); transform: translate(-50%, -50%) scale(1.04); }
+.table-btn .ico { font-size: 24px; line-height: 1; color: var(--gold); }
+.table-btn .txt { display: flex; flex-direction: column; align-items: flex-start; line-height: 1.15; }
+.table-btn b { font-size: 13.5px; }
+.table-btn small { font-size: 11.5px; color: var(--muted); }
+.table-btn.bump { animation: bump .6s ease-out; }
+@keyframes bump { 0% { box-shadow: 0 0 0 0 rgba(231,183,90,.7); } 100% { box-shadow: 0 0 0 12px rgba(231,183,90,0); } }
+@media (max-width: 700px) { .table-btn { padding: 5px 10px 5px 8px; } .table-btn .ico { font-size: 19px; } .table-btn b { font-size: 12px; } }
+
 #spectators { position: absolute; right: 10px; top: 60px; display: flex; flex-direction: column; gap: 6px; z-index: 3; }
 #spectators .spec { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 4px; font-size: 12px; text-align: center; width: 104px; }
 #spectators .spec video { width: 96px; height: 72px; object-fit: cover; border-radius: 7px; display: block; background: #000; }
 
 /* ---------- Aktionsleiste ---------- */
-#actionbar { position: absolute; left: 50%; transform: translateX(-50%); bottom: calc(26vh + 18px); z-index: 6; display: flex; flex-direction: column; align-items: center; gap: 8px; max-width: min(760px, 94vw); pointer-events: none; }
+#actionbar { position: absolute; left: 50%; transform: translateX(-50%); bottom: calc(26vh + 18px); z-index: 6; display: flex; flex-direction: column; align-items: center; gap: 8px; width: max-content; max-width: min(760px, 94vw); pointer-events: none; }
 #actionbar > * { pointer-events: auto; }
 #actionbar .box { padding: 12px 16px; text-align: center; animation: panelIn .45s ease-out both; }
 #actionbar .box.still { animation: none; }
