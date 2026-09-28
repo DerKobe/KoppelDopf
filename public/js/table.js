@@ -281,20 +281,18 @@ export class TableScene {
     const plays = r.trick ? r.trick.plays : [];
     this._plays = plays;
     const playIds = new Set(plays.map((p) => p.card));
-    let collected = false;
+    const collecting = [];
     for (const [id, obj] of [...this.trick]) {
       if (playIds.has(id)) continue;
       this.trick.delete(id);
       const lt = r.lastTrick;
-      if (lt && lt.plays.some((p) => p.card === id)) {
-        const pr = this.rel(lt.winner);
-        obj.speed = 5;
-        obj.wait = 0;
-        this.piles[pr].push(obj);
-        collected = true;
-      } else this.removeObj(obj);
+      if (lt && lt.plays.some((p) => p.card === id)) collecting.push(obj);
+      else this.removeObj(obj);
     }
-    if (collected) this.cb.onEvent?.('collect');
+    if (collecting.length) {
+      this.animateCollect(collecting, this.rel(r.lastTrick.winner));
+      this.cb.onEvent?.('collect');
+    }
 
     // 2) Karten im aktuellen Stich
     plays.forEach((p) => {
@@ -488,9 +486,71 @@ export class TableScene {
   }
 
   // ---------- Render-Schleife ----------
+  // Stich einsammeln ohne dass sich Karten durchdringen:
+  // 1) flach (in Legereihenfolge übereinander) vor dem Gewinner zusammenschieben,
+  // 2) den Stapel als starren Block anheben, umdrehen und verdeckt auf den Stichhaufen legen.
+  animateCollect(objs, rel) {
+    const pile = this.piles[rel];
+    const base = pile.length;
+    const n = objs.length;
+    // die oberste offene Karte liegt nach dem Umdrehen ganz unten
+    for (let k = n - 1; k >= 0; k--) pile.push(objs[k]);
+    const [dx, dz] = DIRS[rel];
+    const gather = new THREE.Vector3(dx * 0.7, 0.04, dz * 0.7);
+    const qUp = this.flat(0, 0, 0, YAWS[rel], true).quat;
+    const top = this.pileSlot(rel, base + n - 1);
+    const GAP0 = 0.03, GAP1 = 0.012;
+    const ease = (x) => (x < 0.5 ? 4 * x * x * x : 1 - (-2 * x + 2) ** 3 / 2);
+    const P = new THREE.Vector3(), Q = new THREE.Quaternion(), off = new THREE.Vector3();
+    objs.forEach((o, k) => {
+      const p0 = o.group.position.clone(), q0 = o.group.quaternion.clone(), s0 = o.group.scale.x;
+      const stackPos = gather.clone().setY(gather.y + k * GAP0);
+      o.wait = 0;
+      o.anim = {
+        t: 0,
+        dur: 1.05,
+        apply: (t) => {
+          const g = o.group;
+          if (t < 0.3) {
+            const e = ease(t / 0.3);
+            g.position.lerpVectors(p0, stackPos, e);
+            g.quaternion.slerpQuaternions(q0, qUp, e);
+            g.scale.setScalar(s0 + (1 - s0) * e);
+          } else if (t < 0.4) {
+            g.position.copy(stackPos);
+            g.quaternion.copy(qUp);
+            g.scale.setScalar(1);
+          } else {
+            const e = ease((t - 0.4) / 0.6);
+            P.lerpVectors(gather, top.pos, e);
+            P.y += Math.sin(Math.PI * e) * 1.3;
+            const rot = THREE.MathUtils.smoothstep(e, 0.1, 0.9);
+            Q.slerpQuaternions(qUp, top.quat, rot);
+            off.set(0, 0, k * (GAP0 + (GAP1 - GAP0) * e)).applyQuaternion(Q);
+            g.position.copy(P).add(off);
+            g.quaternion.copy(Q);
+            g.scale.setScalar(1);
+          }
+        },
+      };
+    });
+  }
+
   frame() {
     const dt = Math.min(0.05, this.clock.getDelta());
     for (const obj of this.objs) {
+      if (obj.anim) {
+        const a = obj.anim;
+        a.t = Math.min(a.dur, a.t + dt);
+        a.apply(a.t / a.dur);
+        if (a.t >= a.dur) {
+          obj.anim = null;
+          obj.tPos.copy(obj.group.position);
+          obj.tQuat.copy(obj.group.quaternion);
+          obj.tScale = 1;
+        }
+        continue;
+      }
       if (obj.wait > 0) { obj.wait -= dt; continue; }
       const k = 1 - Math.exp(-dt * obj.speed);
       obj.group.position.lerp(obj.tPos, k);
