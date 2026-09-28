@@ -529,6 +529,12 @@ export class TableScene {
 
   setSelection(ids) { this.selected = new Set(ids); this.layoutHand(); }
 
+  // true, solange noch Karten in die eigene Hand fliegen (Austeilen, Armut)
+  isDealing() {
+    for (const o of this.hand.values()) if (o.anim) return true;
+    return false;
+  }
+
   seatAnchor(rel) {
     const anchors = [null, [-7.6, 2.4, -0.4], [0, 3.6, -7.4], [7.6, 2.4, -0.4]];
     const a = anchors[rel];
@@ -624,6 +630,9 @@ export class TableScene {
     }
     this.pub.update(dt);
     this.renderer.render(this.scene, this.camera);
+    const dealing = this.isDealing();
+    if (this.wasDealing && !dealing) this.cb.onDealDone?.();
+    this.wasDealing = dealing;
     this.cb.onFrame?.();
   }
 }
