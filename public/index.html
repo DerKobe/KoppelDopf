@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>KoppelDopf – Doppelkopf am Stammtisch</title>
+  <meta name="theme-color" content="#1b100a" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🍺</text></svg>" />
+  <link rel="stylesheet" href="/css/style.css" />
+  <script type="importmap">
+    { "imports": { "three": "/vendor/three/build/three.module.js", "three/addons/": "/vendor/three/examples/jsm/" } }
+  </script>
+</head>
+<body>
+  <div id="app">
+    <div id="scene"></div>
+    <div id="badges"></div>
+    <div id="spectators"></div>
+
+    <div id="topbar">
+      <div id="gameinfo" class="panel hidden"></div>
+      <div id="toolbar">
+        <button class="tb" id="btn-mic" title="Mikrofon">🎤</button>
+        <button class="tb" id="btn-cam" title="Kamera">📷</button>
+        <button class="tb" id="btn-media" title="Voice- & Videochat beitreten">📞 <span>Voice/Video</span></button>
+        <button class="tb" id="btn-last" title="Letzter Stich">🂠</button>
+        <button class="tb" id="btn-score" title="Spielstand">🏆</button>
+        <button class="tb" id="btn-rules" title="Regeln">📜</button>
+        <button class="tb" id="btn-chat" title="Chat">💬<i id="chat-dot" class="dot hidden"></i></button>
+        <button class="tb" id="btn-sound" title="Ton an/aus">🔊</button>
+        <button class="tb" id="btn-menu" title="Menü">☰</button>
+      </div>
+    </div>
+
+    <div id="banner"></div>
+    <div id="toasts"></div>
+    <div id="actionbar"></div>
+
+    <div id="chat" class="panel hidden">
+      <div class="chat-head"><b>Stammtisch-Chat</b><button class="x" data-close="chat">×</button></div>
+      <div id="chat-log"></div>
+      <form id="chat-form"><input id="chat-input" maxlength="300" placeholder="Nachricht…" autocomplete="off" /><button>➤</button></form>
+    </div>
+
+    <div id="modal"></div>
+    <div id="conn" class="hidden">Verbindung zum Stammtisch wird hergestellt…</div>
+  </div>
+  <script type="module" src="/js/main.js"></script>
+</body>
+</html>
