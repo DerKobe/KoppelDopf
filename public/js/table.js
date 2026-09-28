@@ -551,7 +551,12 @@ export class TableScene {
     const anchors = [null, [-7.6, 2.4, -0.4], [0, 3.6, -7.4], [7.6, 2.4, -0.4]];
     const a = anchors[rel];
     if (!a) return null;
-    _v.set(...a).project(this.camera);
+    return this.toScreen(...a);
+  }
+
+  // Bildschirmposition (CSS-Pixel) eines Punkts in der Szene
+  toScreen(x, y, z) {
+    _v.set(x, y, z).project(this.camera);
     const rect = this.renderer.domElement.getBoundingClientRect();
     return { x: (_v.x * 0.5 + 0.5) * rect.width, y: (-_v.y * 0.5 + 0.5) * rect.height };
   }
