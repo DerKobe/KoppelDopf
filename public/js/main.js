@@ -3,7 +3,7 @@ import { TableScene } from './table.js';
 import { createNet } from './net.js';
 import { RTC } from './rtc.js';
 import { playSound, isMuted, setMuted, unlockAudio } from './sound.js';
-import { getCardDataURL } from './cardart.js';
+import { getCardDataURL, getIndexStyle, setIndexStyle } from './cardart.js';
 import { RULE_DEFS, PRESETS, applyPreset } from '/shared/rules.js';
 import { announceLabel, cardName, keyOf, LEVEL_LABELS } from '/shared/cards.js';
 
@@ -611,6 +611,7 @@ function menuHtml() {
   return `<div class="dialog narrow"><div class="result-head"><h2>Menü</h2><button class="x" data-act="closeModal">×</button></div>
     <div class="menu-list">
       <button class="btn" data-act="rename">✏️ Name ändern</button>
+      <button class="btn" data-act="indices" title="Beschriftung von Bube, Dame, König in den Kartenecken">🂫 Kartenecken: ${getIndexStyle() === 'de' ? 'B · D · K' : 'J · Q · K'} (umschalten)</button>
       <button class="btn" data-act="fullscreen">⛶ Vollbild</button>
       <button class="btn" data-act="copy">🔗 Einladungslink kopieren</button>
       ${st.me.seat != null ? '<button class="btn" data-act="leaveSeat">🚶 Aufstehen (Bot übernimmt)</button>' : ''}
@@ -669,6 +670,7 @@ $('#modal').addEventListener('click', async (e) => {
       break;
     }
     case 'fullscreen': toggleFullscreen(); closeModal(); break;
+    case 'indices': setIndexStyle(getIndexStyle() === 'de' ? 'en' : 'de'); S.actionHtml = ''; renderActionBar(); renderModal(); break;
     case 'copy': copyLink(); break;
     case 'leaveSeat':
       if (confirm('Aufstehen? Ein Bot spielt für dich weiter.')) net.send({ t: 'leaveSeat' });

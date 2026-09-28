@@ -11,7 +11,7 @@ const YAWS = [0, -Math.PI / 2, Math.PI, Math.PI / 2];
 const HAND_DIST = 7;
 
 function roundedCardGeometry() {
-  const r = 0.07, w = CW, h = CH;
+  const r = 0.08, w = CW, h = CH; // Eckenradius wie bei den Kartenbildern
   const s = new THREE.Shape();
   s.moveTo(-w / 2 + r, -h / 2);
   s.lineTo(w / 2 - r, -h / 2);
@@ -58,7 +58,8 @@ export class TableScene {
     this.pub = buildPub(this.scene);
 
     this.cardGeo = roundedCardGeometry();
-    this.backMat = new THREE.MeshStandardMaterial({ map: getCardTexture('back'), roughness: 0.6 });
+    // abgedunkelt und leicht kühl getönt: sonst kippt das Weinrot unter der warmen, hellen Tischlampe ins Terrakotta
+    this.backMat = new THREE.MeshStandardMaterial({ map: getCardTexture('back'), roughness: 0.55, color: new THREE.Color(0.3, 0.22, 0.36) });
     this.proxyMat = new THREE.MeshBasicMaterial({ visible: false, side: THREE.DoubleSide });
     this.proxyGeo = new THREE.PlaneGeometry(CW, CH + 0.5);
 
