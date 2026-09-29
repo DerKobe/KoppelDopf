@@ -50,7 +50,31 @@ export class Round {
   }
 
   name(s) { return this.names[s]; }
-  event(text, kind = 'info') { this.events.push({ id: ++this.eventSeq, text, kind }); if (this.events.length > 30) this.events.shift(); }
+  event(text, kind = 'info') {
+    if (this.sim) return; // Simulationen der Bots erzeugen keine Ereignisse
+    this.events.push({ id: ++this.eventSeq, text, kind });
+    if (this.events.length > 30) this.events.shift();
+  }
+
+  // Schnelle Kopie für Bot-Simulationen: eigene Hände/Stichliste, alles Übrige wird geteilt bzw. flach kopiert.
+  cloneForSim(hands = this.hands) {
+    const c = Object.create(Round.prototype);
+    Object.assign(c, this);
+    c.sim = true;
+    c.hands = hands.map((h) => h.slice());
+    c.parties = this.parties.slice();
+    c.revealed = this.revealed.slice();
+    c.cqPlayed = this.cqPlayed.slice();
+    c.reservations = this.reservations.slice();
+    c.tricks = this.tricks.slice();
+    c.trick = this.trick ? { ...this.trick, plays: this.trick.plays.slice() } : null;
+    c.ann = { ...this.ann };
+    c.seatAnn = this.seatAnn.slice();
+    c.annLog = [];
+    c.events = [];
+    c.result = null;
+    return c;
+  }
   countKey(seat, key) { return this.hands[seat].filter((c) => keyOf(c) === key).length; }
 
   // ---------- Vorbehalte ----------
@@ -322,10 +346,19 @@ export class Round {
 
   // ---------- Abrechnung ----------
   finish() {
+    this.result = this.computeResult();
+    this.phase = 'done';
+    this.turn = null;
+    const { winner, pts } = this.result;
+    this.event(winner ? `${winner === 're' ? 'Re' : 'Kontra'} gewinnt mit ${pts[winner]} Augen.` : 'Keine Partei hat gewonnen.', 'big');
+  }
+
+  // Abrechnung aus Stichen und Parteien; ann lässt sich überschreiben (Bots bewerten damit hypothetische Ansagen).
+  computeResult(ann = this.ann) {
     const P = this.parties;
     const pts = { re: 0, kontra: 0 }, tr = { re: 0, kontra: 0 };
     for (const t of this.tricks) { pts[P[t.winner]] += t.points; tr[P[t.winner]]++; }
-    const aR = this.ann.re, aK = this.ann.kontra;
+    const aR = ann.re, aK = ann.kontra;
     const meets = (p, L) => (L === 4 ? tr[other(p)] === 0 : pts[other(p)] < [0, 90, 60, 30][L]);
 
     let reWins, koWins;
@@ -352,9 +385,9 @@ export class Round {
       if (tr[L] === 0) lines.push({ label: 'Gegner schwarz', value: 1 });
       if (aR >= 0) lines.push({ label: 'Re angesagt', value: 2 });
       if (aK >= 0) lines.push({ label: 'Kontra angesagt', value: 2 });
-      for (const p of ['re', 'kontra']) for (let l = 1; l <= this.ann[p]; l++)
+      for (const p of ['re', 'kontra']) for (let l = 1; l <= ann[p]; l++)
         lines.push({ label: `${LEVEL_LABELS[l]} abgesagt (${p === 're' ? 'Re' : 'Kontra'})`, value: 1 });
-      const aL = this.ann[L];
+      const aL = ann[L];
       if (aL >= 1 && pts[winner] >= 120) lines.push({ label: '120 gegen keine 90', value: 1 });
       if (aL >= 2 && pts[winner] >= 90) lines.push({ label: '90 gegen keine 60', value: 1 });
       if (aL >= 3 && pts[winner] >= 60) lines.push({ label: '60 gegen keine 30', value: 1 });
@@ -388,15 +421,12 @@ export class Round {
       else if (soloScoring && winner !== 're') bockTrigger = 'Solo verloren';
     }
 
-    this.result = {
+    return {
       gameLabel: this.gameLabel(null, true),
       parties: P.slice(),
       pts, tricks: tr, winner, lines, specials, gameValue, specialNet, total, perSeat,
-      soloScoring, bock: this.bock, bockTrigger, ann: { ...this.ann },
+      soloScoring, bock: this.bock, bockTrigger, ann: { ...ann },
     };
-    this.phase = 'done';
-    this.turn = null;
-    this.event(winner ? `${winner === 're' ? 'Re' : 'Kontra'} gewinnt mit ${pts[winner]} Augen.` : 'Keine Partei hat gewonnen.', 'big');
   }
 
   gameLabel(viewer = null, final = false) {
