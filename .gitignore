@@ -1,3 +1,4 @@
 node_modules/
 *.pem
 .DS_Store
+text2speech/
