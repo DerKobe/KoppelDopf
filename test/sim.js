@@ -37,7 +37,9 @@ function rngFrom(seed) {
 }
 
 const stats = { games: 0, redeal: 0, types: {}, winners: { re: 0, kontra: 0, none: 0 }, ann: 0 };
-const N = Number(process.argv[2] || 3000);
+const N = Number(process.argv.slice(2).find((a) => /^\d+$/.test(a)) || 3000);
+// --strong: die echten (Monte-Carlo-)Bots statt des schnellen Testmodus
+const LEVEL = process.argv.includes('--strong') ? 'strong' : process.env.BOT_LEVEL || 'fast';
 for (let i = 0; i < N; i++) {
   const rng = rngFrom(i + 1);
   const rules = { ...defaultRules() };
@@ -54,7 +56,7 @@ for (let i = 0; i < N; i++) {
   while (round.phase !== 'done' && round.phase !== 'redeal') {
     if (++guard > 500) throw new Error('Endlosschleife in Runde ' + i);
     if (round.trickComplete()) { round.collectTrick(); continue; }
-    botAct(round, round.turn);
+    botAct(round, round.turn, { level: LEVEL });
   }
   if (round.phase === 'redeal') { stats.redeal++; continue; }
   const res = round.result;
