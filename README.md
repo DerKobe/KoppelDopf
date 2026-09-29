@@ -85,15 +85,37 @@ mit Nano Banana generiertes Motiv. Details: [public/cards/CREDITS.md](public/car
 server/index.js   HTTP(S)-Server, WebSocket, ICE-Konfiguration
 server/room.js    der eine Tisch: Plätze, Gastgeber, Bots, Partie, Chat, WebRTC-Signaling
 server/round.js   ein Spiel: Vorbehalte, Armut, Hochzeit, Stiche, Ansagen, Abrechnung (autoritativ)
-server/bot.js     Heuristik-Bots
+server/bot.js     Bots: Karten, Ansagen und Vorbehalte per Monte-Carlo, Armut regelbasiert
+server/ai/        brain.js (Wissen, Verteilungen würfeln, Entscheidungen), policy.js (Spielstrategie für Simulationen)
 shared/cards.js   Karten, Trumpfreihenfolgen, Bedienpflicht, Stichgewinner (Server + Client)
 shared/rules.js   Regeldefinitionen und Presets
 public/js/        three.js-Szene (table.js, pub.js, cardart.js), UI (main.js), WebRTC (rtc.js)
 public/cards/     Kartenbilder (SVG-Vorderseiten, Rückseite) + Herkunft/Lizenz
 test/sim.js       Regeltests + Simulation tausender Bot-Spiele mit Invarianten-Prüfung
+test/bench.js     Duplikat-Vergleich neue gegen alte Bots (test/legacy-bot.js)
+test/behavior.js  Prüft, wie oft die Bots gängige Faustregeln einhalten
 ```
 
 `npm test` spielt 3000 zufällige Spiele mit zufälligen Regelkombinationen und prüft u. a., dass immer
 240 Augen verteilt werden und die Punkte sich zu null summieren.
 
 Mit `?debug` in der URL steht im Browser `window.KD` zur Fehlersuche bereit.
+
+## Wie die Bots spielen
+
+Die Bots entscheiden per „Perfect Information Monte Carlo“, wie gute Skat- und Doppelkopf-Programme:
+
+1. **Nur echtes Tischwissen:** eigene Karten, gespielte Karten, wer welche Farbe nicht mehr bedienen kann,
+   bekannte Parteien (Kreuz-Dame, Ansagen, Hochzeit, Armut) und Indizien nach den gängigen Faustregeln
+   (wer schmiert, Pik-Dame an Position 2/3, früh gespielte Dulle …). Die Karten der anderen sehen sie nie.
+2. **Verteilungen würfeln**, die zu diesem Wissen passen.
+3. **Jede erlaubte Karte** in jeder Verteilung bis zum Spielende durchspielen (mit einer schnellen Strategie nach
+   den Faustregeln: laufende Asse, Partner-Stich nicht überstechen, schmieren, Füchse schützen …) und die Karte
+   mit dem besten erwarteten Spielergebnis wählen. Kleine Zuschläge für die Faustregeln sorgen dafür, dass
+   die Bots für einen menschlichen Partner berechenbar bleiben; bei knappen Entscheidungen ist etwas Zufall dabei.
+4. **Ansagen** nur, wenn die Simulation hohe Gewinnchancen zeigt (Re/Kontra ~75 %, Absagen ~90 %), in der
+   Regel zum letztmöglichen Zeitpunkt. **Soli und Hochzeit** werden ebenfalls durchgespielt und nur gewählt,
+   wenn sie sich deutlich lohnen.
+
+Eine Kartenentscheidung dauert typisch 50–150 ms. `npm run bench` vergleicht neue und alte Bots im
+Duplikat-Verfahren (gleiche Karten, getauschte Plätze), `npm run behavior` prüft die Faustregeln.
