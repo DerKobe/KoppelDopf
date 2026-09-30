@@ -213,7 +213,9 @@ export class Room {
     this.freeSeat(c);
     this.seats[i] = { kind: 'human', clientId: c.id };
     c.seat = i;
-    if (!this.clients.get(this.hostId)?.online) this.hostId = c.id;
+    // Gastgeber soll jemand am Tisch sein: ein Zuschauer gibt das Amt an den ersten, der sich hinsetzt.
+    const host = this.clients.get(this.hostId);
+    if (!host?.online || host.seat == null) this.hostId = c.id;
   }
 
   leaveSeat(c) {
@@ -223,7 +225,10 @@ export class Room {
       this.seats[i] = { kind: 'bot', name: `${c.name} (Bot)` };
       c.seat = null;
       this.systemChat(`${c.name} steht auf – ein Bot spielt weiter.`);
-    } else this.freeSeat(c);
+    } else {
+      this.freeSeat(c);
+      if (this.hostId === c.id) this.pickHost();
+    }
   }
 
   freeBotName() {
