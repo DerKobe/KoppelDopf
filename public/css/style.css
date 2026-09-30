@@ -90,6 +90,23 @@ button { font: inherit; color: inherit; }
 .mediaicons { position: absolute; bottom: 4px; right: 5px; font-size: 12px; display: flex; gap: 2px; text-shadow: 0 1px 2px #000; }
 .badge .take { margin-top: 3px; }
 
+/* Sprechblasen: Ansagen/Chat erscheinen am Spieler, die Spitze zeigt auf seine Plakette */
+#bubbles { position: absolute; inset: 0; z-index: 9; pointer-events: none; }
+.bubble { position: absolute; pointer-events: none; background: #fdf8ec; color: #2a1706; font-family: var(--serif); font-weight: 700; font-size: 19px; line-height: 1.2; padding: 8px 14px; border-radius: 14px; border: 2px solid var(--gold); box-shadow: 0 8px 22px rgba(0,0,0,.5); white-space: nowrap; animation: bubbleIn .28s cubic-bezier(.2, 1.5, .4, 1) both; }
+.bubble.chat { font-family: var(--sans); font-weight: 600; font-size: 14px; white-space: normal; width: max-content; max-width: 220px; border-color: var(--line); }
+.bubble.out { opacity: 0; transition: opacity .3s; }
+.bubble::after { content: ''; position: absolute; width: 12px; height: 12px; background: inherit; border: inherit; border-width: 0 2px 2px 0; }
+.bubble.r1 { transform-origin: left center; }
+.bubble.r1::after { left: -8px; top: 14px; rotate: 135deg; }
+.bubble.r3 { transform-origin: right center; }
+.bubble.r3::after { right: -8px; top: 14px; rotate: -45deg; }
+.bubble.r2 { translate: -50% 0; transform-origin: top center; }
+.bubble.r2::after { top: -8px; left: calc(50% - 7px); rotate: -135deg; }
+.bubble.r0 { transform-origin: bottom left; white-space: normal; width: max-content; max-width: 150px; } /* schmal: links neben der eigenen Hand */
+.bubble.r0::after { bottom: -8px; left: 22px; rotate: 45deg; }
+@keyframes bubbleIn { from { opacity: 0; scale: .5; } }
+@media (max-width: 700px) { .bubble { font-size: 15px; padding: 6px 10px; } .bubble.chat { font-size: 12.5px; max-width: 150px; } }
+
 /* „Letzter Stich“ – liegt auf dem Tisch neben der Stichmitte */
 .table-btn { position: absolute; z-index: 4; transform: translate(-50%, -50%); white-space: nowrap; display: inline-flex; align-items: center; gap: 8px; padding: 7px 14px 7px 10px; border-radius: 12px; background: var(--panel); border: 1px solid var(--gold-2); color: var(--text); cursor: pointer; box-shadow: 0 6px 18px rgba(0,0,0,.45); transition: border-color .15s, box-shadow .15s, transform .15s; }
 .table-btn:hover { border-color: var(--gold); box-shadow: 0 0 0 2px rgba(231,183,90,.3), 0 6px 18px rgba(0,0,0,.45); transform: translate(-50%, -50%) scale(1.04); }
