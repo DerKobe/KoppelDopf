@@ -590,10 +590,12 @@ function renderModal() {
   el.classList.toggle('passive', passive);
   if (html !== S.modalHtml) {
     const scroll = el.querySelector('.dialog')?.scrollTop || 0;
+    const inner = [...el.querySelectorAll('[data-scroll]')].map((n) => [n.dataset.scroll, n.scrollTop]);
     S.modalHtml = html;
     el.innerHTML = html;
     const d = el.querySelector('.dialog');
     if (d) d.scrollTop = scroll;
+    for (const [k, top] of inner) { const n = el.querySelector(`[data-scroll="${k}"]`); if (n) n.scrollTop = top; }
     if (!S.joined) setTimeout(() => $('#join-name')?.focus(), 50);
     mountVideos();
   }
@@ -641,37 +643,51 @@ function lobbyHtml() {
       if (mine) ops += `<button class="btn small ghost" data-lobby="leave">Aufstehen</button>`;
       else if (host) ops += `<button class="btn small ghost" data-lobby="remove" data-seat="${i}">Entfernen</button>`;
     }
-    const video = s && s.kind === 'human' ? `<div class="face" data-video="${esc(s.clientId)}" data-avatar="${esc((s.name || '?')[0].toUpperCase())}" style="position:relative;width:72px;height:54px;border-radius:8px;overflow:hidden;display:grid;place-items:center;background:#22140a;float:right"></div>` : '';
-    return `<div class="seat ${s ? 'filled' : ''} ${mine ? 'mine' : ''}"><div class="who">${video}Platz ${i + 1}: ${who}</div><div class="ops">${ops}</div></div>`;
+    const video = s && s.kind === 'human' ? `<div class="face" data-video="${esc(s.clientId)}" data-avatar="${esc((s.name || '?')[0].toUpperCase())}" style="position:relative;width:56px;height:42px;border-radius:8px;overflow:hidden;display:grid;place-items:center;background:#22140a;float:right"></div>` : '';
+    return `<div class="seat ${s ? 'filled' : 'empty'} ${mine ? 'mine' : ''}"><div class="who">${video}Platz ${i + 1}: ${who}</div><div class="ops">${ops}</div></div>`;
   }).join('');
   const specs = st.clients.filter((c) => c.seat == null && c.online).map((c) => esc(c.name) + (c.id === S.myId ? ' (Du)' : ''));
-  const full = st.seats.every(Boolean);
   const empty = st.seats.filter((s) => !s).length;
-  return `<div class="dialog">
-    <h1>🍺 Stammtisch KoppelDopf</h1>
-    <p class="lead">Setzt euch an den Tisch, stellt die Sonderregeln ein und los geht's. Fehlende Mitspieler übernehmen Bots.</p>
+  const seated = st.me.seat != null;
+  const freeTxt = empty === 1 ? 'Noch 1 Platz frei' : `Noch ${empty} Plätze frei`;
+  let status;
+  if (empty) {
+    const hint = host ? 'Warte auf deine Freunde oder fülle die freien Plätze mit Bots auf.'
+      : !seated ? 'Setz dich auf einen freien Platz, um mitzuspielen.'
+      : `Sobald alle sitzen, kann ${esc(hostName)} die Partie starten.`;
+    status = `<div class="lobby-status wait">
+      <div class="big">🪑 ${freeTxt}</div>
+      <div>Die Partie startet erst, wenn alle 4 Plätze besetzt sind. ${hint}</div>
+      ${host ? `<button class="btn" data-lobby="fillBots">🤖 Mit Bots auffüllen (${empty})</button>` : ''}
+    </div>`;
+  } else {
+    status = `<div class="lobby-status ready">
+      <div class="big">✅ Alle Plätze besetzt</div>
+      <div>${host ? 'Stell noch die Sonderregeln ein – dann kann es losgehen.' : `Warte, bis ${esc(hostName)} (Gastgeber) die Partie startet.`}</div>
+    </div>`;
+  }
+  return `<div class="dialog lobby">
     <div class="lobby-grid">
-      <div>
+      <div class="lobby-main" data-scroll="lobby-main">
+        <h1>🍺 KoppelDopf</h1>
+        <p class="lead">Der Stammtisch ist offen – setzt euch und los geht's.</p>
         <h3>Plätze</h3>
         <div class="seats">${seats}</div>
-        <div class="row" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
-          ${host && empty ? `<button class="btn" data-lobby="fillBots">🤖 Mit Bots auffüllen (${empty})</button>` : ''}
-          <button class="btn" data-lobby="media">${rtc.localStream ? '📞 Voice/Video verlassen' : '📞 Kamera & Mikro an'}</button>
+        ${specs.length ? `<p style="color:var(--muted);font-size:13px;margin:8px 0 0">Zuschauer: ${specs.join(', ')}</p>` : ''}
+        <div class="lobby-start">
+          ${status}
+          ${host ? `<button class="btn primary big" data-lobby="start" ${empty ? 'disabled' : ''}>${empty ? '🔒 Partie starten' : 'Partie starten'}</button>` : ''}
+          <div class="info">${host ? 'Du bist Gastgeber: du stellst die Regeln ein und startest die Partie.' : `${esc(hostName)} ist Gastgeber: stellt die Regeln ein und startet.`}</div>
         </div>
-        ${specs.length ? `<p style="color:var(--muted);font-size:13px">Zuschauer: ${specs.join(', ')}</p>` : ''}
         <h3>Freunde einladen</h3>
-        <div style="display:flex;gap:8px"><input type="text" readonly value="${esc(location.href)}" onclick="this.select()"><button class="btn" data-lobby="copy">Kopieren</button></div>
-        <p style="color:var(--muted);font-size:12.5px">Für Voice/Video über das Internet muss die Seite per HTTPS erreichbar sein (siehe README).</p>
+        <div class="invite"><input type="text" readonly value="${esc(location.href)}" onclick="this.select()"><button class="btn" data-lobby="copy">Kopieren</button></div>
+        <div class="invite"><button class="btn" data-lobby="media">${rtc.localStream ? '📞 Voice/Video verlassen' : '📞 Kamera & Mikro an'}</button><small>Über das Internet nur per HTTPS (siehe README).</small></div>
       </div>
-      <div>
+      <div class="lobby-rules" data-scroll="lobby-rules">
         <h3>Sonderregeln ${host ? '' : `<small style="color:var(--muted);font-family:var(--sans);font-weight:400">– stellt ${esc(hostName)} ein</small>`}</h3>
         ${host ? `<div class="presets">${Object.entries(PRESETS).map(([k, p]) => `<button class="btn small" data-preset="${k}">${esc(p.label)}</button>`).join('')}</div>` : ''}
         ${rulesListHtml(st.rules, host)}
       </div>
-    </div>
-    <div class="lobby-foot">
-      <div class="info">${host ? 'Du bist Gastgeber: du stellst die Regeln ein und startest die Partie.' : `Warte auf ${esc(hostName)} (Gastgeber), um zu starten.`}</div>
-      ${host ? `<button class="btn primary" data-lobby="start" ${full ? '' : 'disabled'} title="${full ? '' : 'Alle 4 Plätze müssen besetzt sein'}">Partie starten</button>` : ''}
     </div>
   </div>`;
 }
