@@ -159,6 +159,9 @@ export class Room {
       case 'media':
         c.media = { audio: !!msg.audio, video: !!msg.video };
         break;
+      case 'setVoice':
+        c.voice = cleanVoice(msg.voice);
+        break;
       case 'rtc': {
         const target = this.clients.get(String(msg.to));
         if (target?.ws) this.send(target.ws, { t: 'rtc', from: c.id, data: msg.data });
@@ -176,10 +179,10 @@ export class Room {
     let c = this.clients.get(id);
     if (c) {
       if (c.ws && c.ws !== ws) { c.ws.clientId = null; try { c.ws.close(); } catch {} }
-      c.ws = ws; c.online = true; c.name = name;
+      c.ws = ws; c.online = true; c.name = name; c.voice = cleanVoice(msg.voice);
       clearTimeout(this.lobbyLeaveTimers.get(id));
     } else {
-      c = { id, name, ws, seat: null, online: true, media: { audio: false, video: false } };
+      c = { id, name, ws, seat: null, online: true, media: { audio: false, video: false }, voice: cleanVoice(msg.voice) };
       this.clients.set(id, c);
     }
     ws.clientId = id;
@@ -355,7 +358,7 @@ export class Room {
     return {
       hostId: this.hostId,
       rules: this.rules,
-      clients: [...this.clients.values()].map((c) => ({ id: c.id, name: c.name, seat: c.seat, online: c.online, media: c.media })),
+      clients: [...this.clients.values()].map((c) => ({ id: c.id, name: c.name, seat: c.seat, online: c.online, media: c.media, voice: c.voice || null })),
       seats: this.seats.map((s, i) => s && {
         kind: s.kind,
         name: this.seatName(i),
@@ -377,6 +380,11 @@ export class Room {
       this.send(c.ws, { t: 'state', ...base, me: { id: c.id, seat: c.seat, isHost: this.hostId === c.id }, round });
     }
   }
+}
+
+// Stimme für die Sprachansagen (siehe public/audio/voice); null = automatisch
+function cleanVoice(v) {
+  return ['m1', 'm2', 'f1', 'f2'].includes(v) ? v : null;
 }
 
 function cleanName(n) {

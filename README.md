@@ -91,6 +91,7 @@ shared/cards.js   Karten, Trumpfreihenfolgen, Bedienpflicht, Stichgewinner (Serv
 shared/rules.js   Regeldefinitionen und Presets
 public/js/        three.js-Szene (table.js, pub.js, cardart.js), UI (main.js), WebRTC (rtc.js)
 public/cards/     Kartenbilder (SVG-Vorderseiten, Rückseite) + Herkunft/Lizenz
+public/audio/     Sprachansagen (4 Stimmen) + manifest.json
 test/sim.js       Regeltests + Simulation tausender Bot-Spiele mit Invarianten-Prüfung
 test/bench.js     Duplikat-Vergleich neue gegen alte Bots (test/legacy-bot.js)
 test/behavior.js  Prüft, wie oft die Bots gängige Faustregeln einhalten
@@ -100,6 +101,24 @@ test/behavior.js  Prüft, wie oft die Bots gängige Faustregeln einhalten
 240 Augen verteilt werden und die Punkte sich zu null summieren.
 
 Mit `?debug` in der URL steht im Browser `window.KD` zur Fehlersuche bereit.
+
+## Sprachansagen
+
+Ansagen sind am Tisch hörbar – egal ob du, ein Mitspieler oder ein Bot ansagt: Re, Kontra, keine 90/60/30,
+schwarz (mit oder ohne vorangestelltes Re/Kontra), Vorbehalt, Hochzeit, Armut, Schmeißen, alle Soli sowie
+Schweinchen/Superschweinchen. Es gibt vier Stimmen (zwei männlich, zwei weiblich); Bots klingen passend zu
+ihrem Namen, und jeder Mensch kann seine Stimme im Menü unter „Meine Stimme“ wählen – so hören ihn auch die
+anderen. Der Lautsprecher-Knopf schaltet auch die Ansagen stumm.
+
+Die Dateien liegen in `public/audio/voice/<stimme>/<zeile>.mp3` (plus `manifest.json`) und wurden mit Googles
+Gemini-TTS erzeugt (Skript `text2speech/text2speech.js`, nicht versioniert):
+
+```bash
+cd text2speech && npm install && npm run tts -- --list        # Katalog anzeigen
+npm run tts                                                   # fehlende Ansagen erzeugen
+npm run tts -- --only kontra --voices f1 --force               # einzelne neu erzeugen
+npm run tts -- --say "Gut Blatt!" --voice m2 --out gut.mp3     # beliebige kurze Ansage
+```
 
 ## Wie die Bots spielen
 

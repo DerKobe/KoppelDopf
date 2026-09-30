@@ -56,6 +56,55 @@ export function playSound(kind) {
   }
 }
 
+// ---------- Sprachansagen (public/audio/voice/<stimme>/<zeile>.mp3, erzeugt mit text2speech) ----------
+const VOICE_BASE = '/audio/voice';
+let voiceManifest = null;
+const voiceBuffers = new Map(); // "stimme/zeile" -> Promise<AudioBuffer|null>
+
+export const voicesReady = fetch(`${VOICE_BASE}/manifest.json`)
+  .then((r) => (r.ok ? r.json() : null))
+  .then((m) => { voiceManifest = m; return m; })
+  .catch(() => null);
+
+function loadVoice(key) {
+  if (!voiceBuffers.has(key)) {
+    const a = ac();
+    voiceBuffers.set(key, !a ? Promise.resolve(null) : fetch(`${VOICE_BASE}/${key}.mp3`)
+      .then((r) => (r.ok ? r.arrayBuffer() : Promise.reject(new Error(r.status))))
+      .then((buf) => a.decodeAudioData(buf))
+      .catch(() => null));
+  }
+  return voiceBuffers.get(key);
+}
+
+export function hasVoiceLine(voice, line) { return !!voiceManifest?.files?.[`${voice}/${line}`]; }
+
+// Lädt die Ansagen der Stimmen am Tisch schon vorab, damit sie ohne Verzögerung kommen
+export function preloadVoices(voices) {
+  voicesReady.then((m) => {
+    if (!m) return;
+    for (const v of voices) for (const line of Object.keys(m.lines || {})) if (hasVoiceLine(v, line)) loadVoice(`${v}/${line}`);
+  });
+}
+
+// Spielt eine Ansage; liefert false, wenn es dafür keine Sprachdatei gibt (dann greift der Signalton)
+export function playVoice(voice, line) {
+  if (!voiceManifest || !hasVoiceLine(voice, line)) return false;
+  if (muted) return true;
+  const a = ac();
+  if (!a) return false;
+  loadVoice(`${voice}/${line}`).then((buffer) => {
+    if (!buffer || muted) return;
+    const src = a.createBufferSource();
+    src.buffer = buffer;
+    const g = a.createGain();
+    g.gain.value = 0.95;
+    src.connect(g).connect(a.destination);
+    src.start();
+  });
+  return true;
+}
+
 export function isMuted() { return muted; }
 export function setMuted(m) {
   muted = m;

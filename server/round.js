@@ -5,6 +5,8 @@ import {
 } from '../shared/cards.js';
 
 const other = (p) => (p === 're' ? 'kontra' : 're');
+// Kennungen der Sprachdateien (public/audio/voice/<stimme>/<id>.mp3) für die Absage-Stufen
+const LEVEL_VOICE = ['', 'k90', 'k60', 'k30', 'schwarz'];
 
 export class Round {
   constructor({ id, rules, dealer, names, bock = 1, rng = Math.random }) {
@@ -50,9 +52,10 @@ export class Round {
   }
 
   name(s) { return this.names[s]; }
-  event(text, kind = 'info') {
+  // voice: { seat, line } – der Client spielt dazu die passende Sprachansage in der Stimme dieses Spielers
+  event(text, kind = 'info', voice = null) {
     if (this.sim) return; // Simulationen der Bots erzeugen keine Ereignisse
-    this.events.push({ id: ++this.eventSeq, text, kind });
+    this.events.push({ id: ++this.eventSeq, text, kind, voice });
     if (this.events.length > 30) this.events.shift();
   }
 
@@ -102,9 +105,10 @@ export class Round {
     if (choice === 'schmeissen') {
       this.phase = 'redeal';
       this.redeal = { reason: `${this.name(seat)} schmeißt die Karten – es wird neu gegeben.` };
-      this.event(this.redeal.reason, 'big');
+      this.event(this.redeal.reason, 'big', { seat, line: 'schmeissen' });
       return;
     }
+    if (choice !== 'gesund') this.event('', 'voice', { seat, line: 'vorbehalt' }); // nur hörbar, Anzeige über die Plakette
     this.turn = (seat + 1) % 4;
     if (this.reservations.every((x) => x !== null)) this.resolveReservations();
   }
@@ -122,7 +126,7 @@ export class Round {
       this.armut = { poor: armutSeat, rich: null, cards: null, declined: [], returnedTrumps: null, gaveTrumps: null };
       this.phase = 'armutGive';
       this.turn = armutSeat;
-      this.event(`${this.name(armutSeat)} hat eine Armut.`, 'big');
+      this.event(`${this.name(armutSeat)} hat eine Armut.`, 'big', { seat: armutSeat, line: 'armut' });
       return;
     }
     const hz = order.find((s) => this.reservations[s] === 'hochzeit');
@@ -132,7 +136,7 @@ export class Round {
       this.parties[hz] = 're';
       this.revealed[hz] = true;
       const kl = { erster: 'ersten Fremdstich', fehl: 'ersten Fehl-Fremdstich', trumpf: 'ersten Trumpf-Fremdstich' }[this.rules.hochzeitKlaerung];
-      this.event(`${this.name(hz)} hat eine Hochzeit! Partner wird, wer den ${kl} macht.`, 'big');
+      this.event(`${this.name(hz)} hat eine Hochzeit! Partner wird, wer den ${kl} macht.`, 'big', { seat: hz, line: 'hochzeit' });
     } else {
       for (let s = 0; s < 4; s++) this.parties[s] = this.countKey(s, 'CQ') > 0 ? 're' : 'kontra';
       const stille = [0, 1, 2, 3].find((s) => this.countKey(s, 'CQ') === 2);
@@ -146,7 +150,7 @@ export class Round {
     this.soloType = type;
     this.soloist = seat;
     for (let s = 0; s < 4; s++) { this.parties[s] = s === seat ? 're' : 'kontra'; this.revealed[s] = true; }
-    this.event(`${this.name(seat)} spielt ein ${SOLO_TYPES[type].label}!`, 'big');
+    this.event(`${this.name(seat)} spielt ein ${SOLO_TYPES[type].label}!`, 'big', { seat, line: `solo_${type}` });
   }
 
   // ---------- Armut ----------
@@ -250,11 +254,11 @@ export class Round {
     }
     if (this.ctx.schweine && k === 'DA' && !this.schweineShown) {
       this.schweineShown = true;
-      this.event(`${this.name(seat)}: „Schweinchen!“ 🐷`, 'big');
+      this.event(`${this.name(seat)}: „Schweinchen!“ 🐷`, 'big', { seat, line: 'schweinchen' });
     }
     if (this.ctx.superschweine && k === this.ctx.superKey && !this.superShown) {
       this.superShown = true;
-      this.event(`${this.name(seat)}: „Superschweinchen!“ 🐷🐷`, 'big');
+      this.event(`${this.name(seat)}: „Superschweinchen!“ 🐷🐷`, 'big', { seat, line: 'superschweinchen' });
     }
     if (this.trick.plays.length === 4) {
       const idx = trickWinnerIndex(this.ctx, this.trick.plays, this.isLastTrick());
@@ -321,12 +325,14 @@ export class Round {
   announce(seat, level) {
     if (!this.announceOptions(seat).includes(level)) throw new Error('Diese Ansage ist nicht (mehr) möglich.');
     const party = this.parties[seat];
+    const alreadyAnnounced = this.ann[party] >= 0; // dann reicht „Keine Neunzig!“ statt „Re, keine Neunzig!“
     this.ann[party] = level;
     this.seatAnn[seat] = Math.max(this.seatAnn[seat], level);
     this.revealed[seat] = true;
     this.annLog.push({ seat, party, level });
     const label = level === 0 ? announceLabel(party, 0) : `${announceLabel(party, 0)}, ${LEVEL_LABELS[level]}`;
-    this.event(`${this.name(seat)} sagt: „${label}“`, 'announce');
+    const line = level === 0 ? party : alreadyAnnounced ? LEVEL_VOICE[level] : `${party}_${LEVEL_VOICE[level]}`;
+    this.event(`${this.name(seat)} sagt: „${label}“`, 'announce', { seat, line });
   }
 
   // ---------- Wissen eines Spielers über die Parteien ----------

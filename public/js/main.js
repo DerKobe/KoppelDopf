@@ -2,7 +2,7 @@
 import { TableScene } from './table.js';
 import { createNet } from './net.js';
 import { RTC } from './rtc.js';
-import { playSound, isMuted, setMuted, unlockAudio } from './sound.js';
+import { playSound, isMuted, setMuted, unlockAudio, playVoice, preloadVoices } from './sound.js';
 import { getCardDataURL } from './cardart.js';
 import { RULE_DEFS, PRESETS, applyPreset } from '/shared/rules.js';
 import { announceLabel, cardName, keyOf, LEVEL_LABELS } from '/shared/cards.js';
@@ -55,7 +55,7 @@ const net = createNet({
   onClose: () => { if (S.joined) $('#conn').classList.remove('hidden'); },
   onMessage: handleMessage,
 });
-function hello() { net.send({ t: 'hello', clientId, name: S.name }); }
+function hello() { net.send({ t: 'hello', clientId, name: S.name, voice: store.get('kd-voice') || null }); }
 
 const rtc = new RTC({
   send: (to, data) => net.send({ t: 'rtc', to, data }),
@@ -119,6 +119,7 @@ function onState() {
   const r = st.round;
   const me = st.me.seat;
   table.setState({ mySeat: me, round: r });
+  if (st.match) seatVoices(); // lädt die Ansagen der Stimmen am Tisch vorab
 
   if (r) {
     if (r.id !== S.lastRoundId) {
@@ -130,9 +131,13 @@ function onState() {
     for (const e of r.events) {
       if (e.id <= S.lastEventId) continue;
       S.lastEventId = e.id;
-      if (e.kind === 'big' || e.kind === 'announce') banner(e.text);
+      const spoken = e.voice ? playVoice(voiceForSeat(e.voice.seat), e.voice.line) : false;
+      // Ansagen erscheinen als Sprechblase am Spieler – so sieht man sofort, wer was gesagt hat
+      const bubbled = e.voice ? showBubble(e.voice.seat, BUBBLE_TEXT[e.voice.line] || e.text) : false;
+      if (e.kind === 'voice') continue; // reine Sprachansage (z.B. „Vorbehalt!“)
+      if ((e.kind === 'big' || e.kind === 'announce') && !bubbled) banner(e.text);
       toast(e.text);
-      if (e.kind === 'announce') playSound('announce');
+      if (e.kind === 'announce' && !spoken) playSound('announce');
     }
     // Armut: Trümpfe vorauswählen
     if (r.phase === 'armutGive' && r.armut?.poor === me && S.preselectFor !== r.id) {
@@ -164,6 +169,85 @@ function onState() {
   renderLastTrickButton();
   renderToolbar();
   updateChalkboard();
+}
+
+// ---------- Stimmen der Spieler für die Sprachansagen ----------
+// 1) selbst gewählte Stimme (Menü), 2) Bots passend zum Namen, 3) übrige Menschen bekommen eine noch freie Stimme.
+// Lieber zwei gleiche Stimmen als ein „Kalle“ mit Frauenstimme.
+const VOICE_OPTIONS = [
+  [null, 'automatisch'], ['m1', 'männlich, rau'], ['m2', 'männlich, lebhaft'], ['f1', 'weiblich, bestimmt'], ['f2', 'weiblich, warm'],
+];
+const FEMALE_BOTS = ['Gisela', 'Uschi', 'Helga', 'Erika', 'Trude'];
+let voiceCache = { key: '', voices: [] };
+function seatVoices() {
+  const seats = S.state?.seats || [];
+  const chosen = seats.map((s) => (s?.kind === 'human' ? S.state.clients.find((c) => c.id === s.clientId)?.voice || null : null));
+  const key = seats.map((s, i) => `${s?.kind}:${s?.name}:${chosen[i]}`).join('|');
+  if (key === voiceCache.key) return voiceCache.voices;
+  const used = new Set(chosen.filter(Boolean));
+  const voices = chosen.slice();
+  const genderCount = { m: 0, f: 0 };
+  seats.forEach((s, i) => {
+    if (s?.kind !== 'bot') return;
+    const g = FEMALE_BOTS.includes(String(s.name).replace(/ \(Bot\)$/, '')) ? 'f' : 'm';
+    const pool = [`${g}1`, `${g}2`];
+    voices[i] = pool.find((v) => !used.has(v)) || pool[genderCount[g]++ % 2];
+    used.add(voices[i]);
+  });
+  for (let i = 0; i < 4; i++) if (!voices[i]) { voices[i] = ['m1', 'm2', 'f1', 'f2'].find((v) => !used.has(v)) || ['m1', 'f1'][i % 2]; used.add(voices[i]); }
+  voiceCache = { key, voices };
+  preloadVoices(voices);
+  return voices;
+}
+function voiceForSeat(seat) { return seatVoices()[seat] || 'm1'; }
+
+// ---------- Sprechblasen an den Plaketten ----------
+const BUBBLE_TEXT = {
+  re: 'Re!', kontra: 'Kontra!',
+  re_k90: 'Re, keine 90!', re_k60: 'Re, keine 60!', re_k30: 'Re, keine 30!', re_schwarz: 'Re, schwarz!',
+  kontra_k90: 'Kontra, keine 90!', kontra_k60: 'Kontra, keine 60!', kontra_k30: 'Kontra, keine 30!', kontra_schwarz: 'Kontra, schwarz!',
+  k90: 'Keine 90!', k60: 'Keine 60!', k30: 'Keine 30!', schwarz: 'Schwarz!',
+  vorbehalt: 'Vorbehalt!', hochzeit: 'Hochzeit! 💍', armut: 'Armut!', schmeissen: 'Ich schmeiß!',
+  solo_damen: 'Damensolo!', solo_buben: 'Bubensolo!', solo_C: 'Kreuzsolo!', solo_S: 'Piksolo!', solo_H: 'Herzsolo!',
+  solo_D: 'Karosolo!', solo_fleischlos: 'Fleischloser!', schweinchen: 'Schweinchen! 🐷', superschweinchen: 'Superschweinchen! 🐷🐷',
+};
+
+// Zeigt eine Sprechblase an der Plakette eines Platzes (die Spitze zeigt auf den Spieler).
+// Die Blasen liegen in einer eigenen, obersten Ebene (#bubbles) und folgen ihrer Plakette in jedem Bild,
+// damit sie nie hinter der Aktionsleiste verschwinden; Klicks gehen durch sie hindurch.
+const bubbleEls = new Map(); // seat -> Element
+function showBubble(seat, text, { kind = 'call', ms = 3200 } = {}) {
+  const b = badgeEls[seat];
+  if (!b || b.classList.contains('hidden') || !text) return false;
+  bubbleEls.get(seat)?.remove();
+  const el = document.createElement('div');
+  el.className = `bubble r${b.dataset.rel} ${kind}`;
+  el.textContent = text;
+  $('#bubbles').appendChild(el);
+  bubbleEls.set(seat, el);
+  positionBubbles();
+  clearTimeout(el.timer);
+  el.timer = setTimeout(() => {
+    el.classList.add('out');
+    setTimeout(() => { el.remove(); if (bubbleEls.get(seat) === el) bubbleEls.delete(seat); }, 350);
+  }, ms);
+  return true;
+}
+
+function positionBubbles() {
+  for (const [seat, el] of bubbleEls) {
+    const b = badgeEls[seat];
+    if (!b || b.classList.contains('hidden')) { el.style.display = 'none'; continue; }
+    el.style.display = '';
+    const r = b.getBoundingClientRect();
+    const rel = Number(b.dataset.rel);
+    const st = el.style;
+    st.left = st.right = st.top = st.bottom = '';
+    if (rel === 1) { st.left = `${r.right + 12}px`; st.top = `${r.top + 14}px`; }
+    else if (rel === 3) { st.right = `${window.innerWidth - r.left + 12}px`; st.top = `${r.top + 14}px`; }
+    else if (rel === 2) { st.left = `${r.left + r.width / 2}px`; st.top = `${r.bottom + 12}px`; }
+    else { st.left = `${r.left + 4}px`; st.bottom = `${window.innerHeight - r.top + 12}px`; }
+  }
 }
 
 // ---------- Spielinfo oben links ----------
@@ -287,6 +371,7 @@ function positionLastTrickButton() {
 function positionBadges() {
   const st = S.state;
   positionLastTrickButton();
+  positionBubbles();
   if (!st?.match) return;
   const w = window.innerWidth, h = window.innerHeight;
   const now = performance.now();
@@ -663,6 +748,7 @@ function menuHtml() {
   return `<div class="dialog narrow"><div class="result-head"><h2>Menü</h2><button class="x" data-act="closeModal">×</button></div>
     <div class="menu-list">
       <button class="btn" data-act="rename">✏️ Name ändern</button>
+      <button class="btn" data-act="voice" title="In dieser Stimme hören die anderen deine Ansagen">🗣️ Meine Stimme: ${esc(VOICE_OPTIONS.find(([k]) => k === (store.get('kd-voice') || null))[1])} (ändern)</button>
       <button class="btn" data-act="fullscreen">⛶ Vollbild</button>
       <button class="btn" data-act="copy">🔗 Einladungslink kopieren</button>
       ${st.me.seat != null ? '<button class="btn" data-act="leaveSeat">🚶 Aufstehen (Bot übernimmt)</button>' : ''}
@@ -721,6 +807,16 @@ $('#modal').addEventListener('click', async (e) => {
       break;
     }
     case 'fullscreen': toggleFullscreen(); closeModal(); break;
+    case 'voice': {
+      const cur = store.get('kd-voice') || null;
+      const next = VOICE_OPTIONS[(VOICE_OPTIONS.findIndex(([k]) => k === cur) + 1) % VOICE_OPTIONS.length][0];
+      store.set('kd-voice', next || '');
+      net.send({ t: 'setVoice', voice: next });
+      S.modalHtml = '';
+      renderModal();
+      if (next) playVoice(next, 're'); // Hörprobe
+      break;
+    }
     case 'copy': copyLink(); break;
     case 'leaveSeat':
       if (confirm('Aufstehen? Ein Bot spielt für dich weiter.')) net.send({ t: 'leaveSeat' });
@@ -800,9 +896,11 @@ function addChat(e, silent) {
   log.appendChild(div);
   while (log.children.length > 150) log.firstChild.remove();
   log.scrollTop = log.scrollHeight;
+  // Chat von Spielern am Tisch erscheint auch als Sprechblase an ihrer Plakette
+  const bubbled = !silent && !e.system && e.seat != null && S.state?.match ? showBubble(e.seat, e.text, { kind: 'chat', ms: 5000 }) : false;
   if (!silent && !S.chatOpen) {
     $('#chat-dot').classList.remove('hidden');
-    if (!e.system) toast(`💬 ${e.from}: ${e.text}`);
+    if (!e.system && !bubbled) toast(`💬 ${e.from}: ${e.text}`);
   }
 }
 
@@ -842,7 +940,7 @@ function updateChalkboard() {
 }
 
 // ---------- Start ----------
-if (new URLSearchParams(location.search).has('debug')) window.KD = { S, net, table, rtc };
+if (new URLSearchParams(location.search).has('debug')) window.KD = { S, net, table, rtc, showBubble };
 renderModal();
 renderToolbar();
 setInterval(() => { if (rtc.localStream || rtc.peers.size) mountVideos(); }, 2000);
