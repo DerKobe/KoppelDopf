@@ -49,6 +49,7 @@ export class Round {
     this.redeal = null;
     this.events = [];
     this.eventSeq = 0;
+    this.foxCalled = new Set(); // schon während des Spiels ausgerufene Füchse ("stich-platz")
   }
 
   name(s) { return this.names[s]; }
@@ -108,7 +109,7 @@ export class Round {
       this.event(this.redeal.reason, 'big', { seat, line: 'schmeissen' });
       return;
     }
-    if (choice !== 'gesund') this.event('', 'voice', { seat, line: 'vorbehalt' }); // nur hörbar, Anzeige über die Plakette
+    this.event('', 'voice', { seat, line: choice === 'gesund' ? 'gesund' : 'vorbehalt' }); // nur hörbar + Sprechblase
     this.turn = (seat + 1) % 4;
     if (this.reservations.every((x) => x !== null)) this.resolveReservations();
   }
@@ -300,9 +301,27 @@ export class Round {
         this.event(`Kein Partner gefunden – ${this.name(this.hochzeiter)} spielt allein (Solo).`, 'big');
       }
     }
+    this.callSpecials(t);
     if (this.tricks.length === this.handSize) { this.finish(); return; }
     this.trick = { leader: t.winner, plays: [] };
     this.turn = t.winner;
+  }
+
+  // Sprüche für Sonderpunkte, gesagt von dem, der den Stich bekommt. Einen Fuchs ruft er nur aus, wenn für alle am
+  // Tisch schon feststeht, dass der Fuchs von der Gegenpartei kam – sonst würde der Spruch die Parteien verraten.
+  // Die übrigen gefangenen Füchse und das Karlchen folgen am Spielende (finish).
+  callSpecials(t) {
+    if (this.sim || this.gameType === 'solo' || this.hochzeitFailed) return;
+    const w = t.winner;
+    if (this.rules.doppelkopf && t.points >= 40)
+      this.event(`${this.name(w)}: „Doppelkopf!“ (${t.points} Augen)`, 'info', { seat: w, line: 'doppelkopf' });
+    if (!this.rules.fuchs || this.ctx.schweine || this.gameType === 'stille') return;
+    const known = this.knownParties(null);
+    for (const pl of t.plays) {
+      if (keyOf(pl.card) !== 'DA' || !known[pl.seat] || !known[w] || known[pl.seat] === known[w]) continue;
+      this.foxCalled.add(`${this.tricks.length - 1}-${pl.seat}`);
+      this.event(`${this.name(w)}: „Fuchs geklaut!“ 🦊 (von ${this.name(pl.seat)})`, 'info', { seat: w, line: 'fuchs' });
+    }
   }
 
   // ---------- Ansagen ----------
@@ -356,6 +375,13 @@ export class Round {
     this.phase = 'done';
     this.turn = null;
     const { winner, pts } = this.result;
+    if (!this.sim) {
+      for (const sp of this.result.specials) {
+        if (sp.kind === 'fuchs' && !this.foxCalled.has(`${sp.trick}-${sp.from}`))
+          this.event(`${this.name(sp.seat)}: „Fuchs geklaut!“ 🦊 (von ${this.name(sp.from)})`, 'info', { seat: sp.seat, line: 'fuchs' });
+        if (sp.kind === 'karlchen') this.event(`${this.name(sp.seat)}: „Karlchen!“ – Kreuz-Bube macht den letzten Stich`, 'info', { seat: sp.seat, line: 'karlchen' });
+      }
+    }
     this.event(winner ? `${winner === 're' ? 'Re' : 'Kontra'} gewinnt mit ${pts[winner]} Augen.` : 'Keine Partei hat gewonnen.', 'big');
   }
 
@@ -406,14 +432,14 @@ export class Round {
     if (!soloScoring) {
       this.tricks.forEach((t, i) => {
         const wp = P[t.winner];
-        if (this.rules.doppelkopf && t.points >= 40) specials.push({ label: `Doppelkopf (${t.points} Augen)`, party: wp, seat: t.winner });
+        if (this.rules.doppelkopf && t.points >= 40) specials.push({ kind: 'doppelkopf', label: `Doppelkopf (${t.points} Augen)`, party: wp, seat: t.winner, trick: i });
         if (this.rules.fuchs && !this.ctx.schweine) {
           for (const pl of t.plays) if (keyOf(pl.card) === 'DA' && P[pl.seat] !== wp)
-            specials.push({ label: `Fuchs von ${this.name(pl.seat)} gefangen`, party: wp, seat: t.winner });
+            specials.push({ kind: 'fuchs', label: `Fuchs von ${this.name(pl.seat)} gefangen`, party: wp, seat: t.winner, trick: i, from: pl.seat });
         }
         if (this.rules.karlchen && i === this.tricks.length - 1) {
           const wc = t.plays.find((p) => p.seat === t.winner).card;
-          if (keyOf(wc) === 'CJ') specials.push({ label: 'Karlchen macht den letzten Stich', party: wp, seat: t.winner });
+          if (keyOf(wc) === 'CJ') specials.push({ kind: 'karlchen', label: 'Karlchen macht den letzten Stich', party: wp, seat: t.winner, trick: i });
         }
       });
     }

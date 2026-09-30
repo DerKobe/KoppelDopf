@@ -207,18 +207,31 @@ const BUBBLE_TEXT = {
   re_k90: 'Re, keine 90!', re_k60: 'Re, keine 60!', re_k30: 'Re, keine 30!', re_schwarz: 'Re, schwarz!',
   kontra_k90: 'Kontra, keine 90!', kontra_k60: 'Kontra, keine 60!', kontra_k30: 'Kontra, keine 30!', kontra_schwarz: 'Kontra, schwarz!',
   k90: 'Keine 90!', k60: 'Keine 60!', k30: 'Keine 30!', schwarz: 'Schwarz!',
-  vorbehalt: 'Vorbehalt!', hochzeit: 'Hochzeit! 💍', armut: 'Armut!', schmeissen: 'Ich schmeiß!',
+  gesund: 'Gesund!', vorbehalt: 'Vorbehalt!', hochzeit: 'Hochzeit! 💍', armut: 'Armut!', schmeissen: 'Ich schmeiß!',
   solo_damen: 'Damensolo!', solo_buben: 'Bubensolo!', solo_C: 'Kreuzsolo!', solo_S: 'Piksolo!', solo_H: 'Herzsolo!',
   solo_D: 'Karosolo!', solo_fleischlos: 'Fleischloser!', schweinchen: 'Schweinchen! 🐷', superschweinchen: 'Superschweinchen! 🐷🐷',
+  fuchs: 'Fuchs geklaut! 🦊', karlchen: 'Karlchen!', doppelkopf: 'Doppelkopf!',
 };
 
 // Zeigt eine Sprechblase an der Plakette eines Platzes (die Spitze zeigt auf den Spieler).
 // Die Blasen liegen in einer eigenen, obersten Ebene (#bubbles) und folgen ihrer Plakette in jedem Bild,
 // damit sie nie hinter der Aktionsleiste verschwinden; Klicks gehen durch sie hindurch.
 const bubbleEls = new Map(); // seat -> Element
-function showBubble(seat, text, { kind = 'call', ms = 3200 } = {}) {
+const bubbleFree = new Map(); // seat -> Zeitpunkt, ab dem die nächste Blase dieses Platzes erscheinen darf
+const BUBBLE_GAP = 1400; // sagt jemand zwei Sprüche direkt nacheinander (Fuchs + Karlchen), bleibt der erste kurz stehen
+function showBubble(seat, text, opts = {}) {
   const b = badgeEls[seat];
   if (!b || b.classList.contains('hidden') || !text) return false;
+  const now = performance.now();
+  const wait = (bubbleFree.get(seat) || 0) - now;
+  bubbleFree.set(seat, Math.max(now, now + wait) + BUBBLE_GAP);
+  if (wait > 0) { setTimeout(() => showBubbleNow(seat, text, opts), wait); return true; }
+  showBubbleNow(seat, text, opts);
+  return true;
+}
+function showBubbleNow(seat, text, { kind = 'call', ms = 3200 } = {}) {
+  const b = badgeEls[seat];
+  if (!b || b.classList.contains('hidden')) return;
   bubbleEls.get(seat)?.remove();
   const el = document.createElement('div');
   el.className = `bubble r${b.dataset.rel} ${kind}`;

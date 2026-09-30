@@ -93,17 +93,24 @@ export function playVoice(voice, line) {
   if (muted) return true;
   const a = ac();
   if (!a) return false;
-  loadVoice(`${voice}/${line}`).then((buffer) => {
+  // Nacheinander statt übereinander: kommen mehrere Sprüche gleichzeitig (Fuchs, Karlchen, …), wartet jeder, bis der
+  // vorige verklungen ist. Wer zu lange in der Schlange stünde, wird ausgelassen.
+  voiceChain = voiceChain.then(() => loadVoice(`${voice}/${line}`)).then((buffer) => {
     if (!buffer || muted) return;
+    const at = Math.max(a.currentTime, voiceFreeAt);
+    if (at - a.currentTime > 3) return;
     const src = a.createBufferSource();
     src.buffer = buffer;
     const g = a.createGain();
     g.gain.value = 0.95;
     src.connect(g).connect(a.destination);
-    src.start();
-  });
+    src.start(at);
+    voiceFreeAt = at + buffer.duration + 0.12;
+  }).catch(() => {});
   return true;
 }
+let voiceChain = Promise.resolve();
+let voiceFreeAt = 0;
 
 export function isMuted() { return muted; }
 export function setMuted(m) {
