@@ -44,7 +44,11 @@
     "solo_D": "Karosolo!",
     "solo_fleischlos": "Fleischloser!",
     "schweinchen": "Schweinchen!",
-    "superschweinchen": "Superschweinchen!"
+    "superschweinchen": "Superschweinchen!",
+    "gesund": "Gesund!",
+    "fuchs": "Fuchs geklaut!",
+    "karlchen": "Karlchen!",
+    "doppelkopf": "Doppelkopf!"
   },
   "files": {
     "m1/re": 0.426,
@@ -154,7 +158,23 @@
     "f2/solo_D": 1.161,
     "f2/solo_fleischlos": 1.238,
     "f2/schweinchen": 1.325,
-    "f2/superschweinchen": 1.208
+    "f2/superschweinchen": 1.208,
+    "m1/gesund": 0.482,
+    "m1/fuchs": 1.024,
+    "m1/karlchen": 0.916,
+    "m1/doppelkopf": 0.912,
+    "m2/gesund": 0.484,
+    "m2/fuchs": 1.31,
+    "m2/karlchen": 0.97,
+    "m2/doppelkopf": 1.02,
+    "f1/gesund": 0.402,
+    "f1/fuchs": 1.25,
+    "f1/karlchen": 1.151,
+    "f1/doppelkopf": 1.023,
+    "f2/gesund": 0.5,
+    "f2/fuchs": 1.285,
+    "f2/karlchen": 0.94,
+    "f2/doppelkopf": 0.89
   },
   "model": "gemini-2.5-pro-tts"
 }

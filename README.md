@@ -105,8 +105,10 @@ Mit `?debug` in der URL steht im Browser `window.KD` zur Fehlersuche bereit.
 ## Sprachansagen
 
 Ansagen sind am Tisch hörbar – egal ob du, ein Mitspieler oder ein Bot ansagt: Re, Kontra, keine 90/60/30,
-schwarz (mit oder ohne vorangestelltes Re/Kontra), Vorbehalt, Hochzeit, Armut, Schmeißen, alle Soli sowie
-Schweinchen/Superschweinchen. Es gibt vier Stimmen (zwei männlich, zwei weiblich); Bots klingen passend zu
+schwarz (mit oder ohne vorangestelltes Re/Kontra), Gesund, Vorbehalt, Hochzeit, Armut, Schmeißen, alle Soli sowie
+Schweinchen/Superschweinchen. Wer einen Sonderpunkt holt, ruft ihn aus: „Doppelkopf!“ sofort, „Fuchs geklaut!“
+sofort, wenn die Parteien schon für alle feststehen (sonst am Spielende, damit der Spruch nichts verrät), „Karlchen!“
+am Spielende. Es gibt vier Stimmen (zwei männlich, zwei weiblich); Bots klingen passend zu
 ihrem Namen, und jeder Mensch kann seine Stimme im Menü unter „Meine Stimme“ wählen – so hören ihn auch die
 anderen. Der Lautsprecher-Knopf schaltet auch die Ansagen stumm.
 
