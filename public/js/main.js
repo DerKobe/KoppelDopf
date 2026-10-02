@@ -93,6 +93,7 @@ function handleMessage(msg) {
 // ---------- 3D-Tisch ----------
 const table = new TableScene($('#scene'), {
   onPlay: (id) => net.send({ t: 'play', card: id }),
+  onLastTrick: () => { if (S.state?.match && S.state.round?.lastTrick) openModal('last'); },
   onIllegal: () => { toast('Diese Karte geht nicht – du musst Farbe bedienen.', 'err'); playSound('error'); },
   onSelectionChange: (ids) => { S.selection = ids; renderActionBar(); },
   getSelectMode: () => selectMode(),

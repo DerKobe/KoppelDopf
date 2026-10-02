@@ -453,6 +453,8 @@ export class TableScene {
     this.myTurn = r.phase === 'playing' && r.turn === this.mySeat && this.mySeat != null && (r.trick?.plays.length ?? 0) < 4;
     this.selectMode = this.cb.getSelectMode?.() || false;
     if (!this.selectMode) this.selected.clear();
+    // Stapel mit dem letzten Stich ist anklickbar (öffnet die Ansicht „Letzter Stich“)
+    this.lastTrickRel = r.lastTrick && (r.phase === 'playing' || r.phase === 'done') ? this.rel(r.lastTrick.winner) : null;
     this.turn = r.phase === 'playing' || r.phase === 'reservation' || r.phase.startsWith('armut') ? r.turn : null;
     this.layoutAll();
   }
@@ -518,11 +520,20 @@ export class TableScene {
     return hits.length ? hits[0].object.userData.id : null;
   }
 
+  // Trifft der Zeiger den Stichhaufen mit dem letzten Stich?
+  pickLastTrickPile() {
+    const pile = this.lastTrickRel != null ? this.piles[this.lastTrickRel] : null;
+    if (!pile?.length) return false;
+    this.raycaster.setFromCamera(this.pointer, this.camera);
+    return this.raycaster.intersectObjects(pile.map((o) => o.group), true).length > 0;
+  }
+
   updateHover() {
     const id = this.pick();
+    const onPile = !id && this.pickLastTrickPile();
+    this.renderer.domElement.style.cursor = onPile || (id && (this.selectMode || (this.myTurn && this.playable.has(id)))) ? 'pointer' : 'default';
     if (id !== this.hovered) {
       this.hovered = id;
-      this.renderer.domElement.style.cursor = id && (this.selectMode || (this.myTurn && this.playable.has(id))) ? 'pointer' : 'default';
       this.layoutHand();
     }
   }
@@ -530,6 +541,7 @@ export class TableScene {
   onPointerUp(e) {
     this.setPointer(e);
     const id = this.pick();
+    if (!id && this.pickLastTrickPile()) { this.cb.onLastTrick?.(); return; }
     if (!id) { if (e.pointerType === 'touch' && this.hovered) { this.hovered = null; this.layoutHand(); } return; }
     if (e.pointerType === 'touch' && this.hovered !== id && !this.selectMode) {
       // Touch: erstes Antippen hebt die Karte an, zweites spielt sie
