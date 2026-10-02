@@ -2,6 +2,7 @@
 import * as THREE from 'three';
 import { getCardTexture, setMaxAnisotropy } from './cardart.js';
 import { buildPub } from './pub.js';
+import { Figures } from './figures.js';
 
 const CW = 1.0, CH = 1.5;
 // relative Sitzposition: 0 = ich (unten), 1 = links, 2 = gegenüber, 3 = rechts (Spielrichtung im Uhrzeigersinn)
@@ -70,6 +71,7 @@ export class TableScene {
     this.scene = new THREE.Scene();
     this.camera = new THREE.PerspectiveCamera(45, 1, 0.1, 200);
     this.pub = buildPub(this.scene);
+    this.figures = new Figures(this.scene);
 
     this.cardGeo = roundedCardGeometry();
     this.backMat = cardMaterial(getCardTexture('back'));
@@ -374,6 +376,7 @@ export class TableScene {
         const back = this.opp[rr].pop();
         const spawn = back ? { pos: back.group.position.clone(), quat: back.group.quaternion.clone(), scale: back.group.scale.x } : this.seatSpot(p.seat);
         if (back) this.removeObj(back);
+        if (!fresh) this.figures.reach(rr);
         obj = this.makeCard(p.card, spawn);
       }
       this.setFace(obj, p.card);
@@ -553,6 +556,32 @@ export class TableScene {
     return false;
   }
 
+  // Für die Figuren: wo ihr Kartenfächer ist (Mitte + Aufwärtsrichtung wie in oppSlot), wohin sie schauen, ob sie dran sind
+  figureContext(rel) {
+    const [dx, dz] = DIRS[rel];
+    const n = this.opp[rel].length;
+    // Griffpunkte seitlich neben dem Fächer: an der unteren Außenkante der äußersten Karte, eine Handbreite
+    // daneben und knapp hinter der Kartenebene – so greifen die Hände den Fächer, ohne durch Karten zu stechen.
+    // Geometrie wie in oppSlot (Fächer um einen Drehpunkt R unterhalb, Karten 0.8 × 1.2 groß).
+    let hold = null;
+    if (n) {
+      const spread = 0.085, R = 2.4, halfW = CW * 0.4;
+      const frame = new THREE.Quaternion().setFromEuler(new THREE.Euler(0.35, Math.atan2(dx, dz), 0, 'YXZ'));
+      const base = new THREE.Vector3(dx * 5.4, 1.4, dz * 5.4);
+      hold = [-1, 1].map((side) => {
+        const i = side < 0 ? 0 : n - 1;
+        const a = (i - (n - 1) / 2) * spread;
+        const ca = Math.cos(a), sa = Math.sin(a);
+        const lx = side * (halfW + 0.3), ly = -0.3; // Punkt im Kartensystem (um -a gedreht, wie die Karte selbst)
+        const p = new THREE.Vector3(Math.sin(a) * R + lx * ca + ly * sa, Math.cos(a) * R - R - lx * sa + ly * ca, 0.08);
+        return p.applyQuaternion(frame).add(base);
+      });
+    }
+    const turnRel = this.turn != null ? this.rel(this.turn) : null;
+    const look = turnRel != null && turnRel !== rel ? new THREE.Vector3(DIRS[turnRel][0] * 5, 1, DIRS[turnRel][1] * 5) : new THREE.Vector3(0, 0, 0);
+    return { hold, look, myTurn: turnRel === rel };
+  }
+
   seatAnchor(rel) {
     const anchors = [null, [-7.6, 2.4, -0.4], [0, 3.6, -7.4], [7.6, 2.4, -0.4]];
     const a = anchors[rel];
@@ -652,6 +681,7 @@ export class TableScene {
       this.turnRing.scale.setScalar(1 + 0.06 * Math.sin(t * 4));
     }
     this.pub.update(dt);
+    this.figures.update(dt, (rel) => this.figureContext(rel));
     this.renderer.render(this.scene, this.camera);
     const dealing = this.isDealing();
     if (this.wasDealing && !dealing) this.cb.onDealDone?.();
