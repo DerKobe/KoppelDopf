@@ -89,7 +89,7 @@ server/bot.js     Bots: Karten, Ansagen und Vorbehalte per Monte-Carlo, Armut re
 server/ai/        brain.js (Wissen, Verteilungen würfeln, Entscheidungen), policy.js (Spielstrategie für Simulationen)
 shared/cards.js   Karten, Trumpfreihenfolgen, Bedienpflicht, Stichgewinner (Server + Client)
 shared/rules.js   Regeldefinitionen und Presets
-public/js/        three.js-Szene (table.js, pub.js, cardart.js), UI (main.js), WebRTC (rtc.js)
+public/js/        three.js-Szene (table.js, pub.js, cardart.js, figures.js), UI (main.js), WebRTC (rtc.js)
 public/cards/     Kartenbilder (SVG-Vorderseiten, Rückseite) + Herkunft/Lizenz
 public/audio/     Sprachansagen (4 Stimmen) + manifest.json
 test/sim.js       Regeltests + Simulation tausender Bot-Spiele mit Invarianten-Prüfung

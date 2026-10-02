@@ -119,6 +119,7 @@ function onState() {
   const r = st.round;
   const me = st.me.seat;
   table.setState({ mySeat: me, round: r });
+  updateFigures();
   if (st.match) seatVoices(); // lädt die Ansagen der Stimmen am Tisch vorab
 
   if (r) {
@@ -200,6 +201,20 @@ function seatVoices() {
   return voices;
 }
 function voiceForSeat(seat) { return seatVoices()[seat] || 'm1'; }
+
+// Figuren auf den Stühlen der Mitspieler (experimentell, im Menü abschaltbar). Der eigene Platz bleibt frei;
+// das Geschlecht folgt der Stimme, damit Figur und Ansage zusammenpassen.
+const figuresOn = () => store.get('kd-figures') !== '0';
+function updateFigures() {
+  table.figures.setVisible(figuresOn());
+  const seats = S.state?.seats || [];
+  const base = S.state?.me.seat ?? 0;
+  table.figures.setSeats([0, 1, 2, 3].map((rel) => {
+    const seat = (base + rel) % 4, s = seats[seat];
+    if (rel === 0 || !s) return null;
+    return { key: String(s.name).replace(/ \(Bot\)$/, ''), female: voiceForSeat(seat).startsWith('f') };
+  }));
+}
 
 // ---------- Sprechblasen an den Plaketten ----------
 const BUBBLE_TEXT = {
@@ -778,6 +793,7 @@ function menuHtml() {
     <div class="menu-list">
       <button class="btn" data-act="rename">✏️ Name ändern</button>
       <button class="btn" data-act="voice" title="In dieser Stimme hören die anderen deine Ansagen">🗣️ Meine Stimme: ${esc(VOICE_OPTIONS.find(([k]) => k === (store.get('kd-voice') || null))[1])} (ändern)</button>
+      <button class="btn" data-act="figures">🧍 Figuren am Tisch: ${figuresOn() ? 'an' : 'aus'} (experimentell)</button>
       <button class="btn" data-act="fullscreen">⛶ Vollbild</button>
       <button class="btn" data-act="copy">🔗 Einladungslink kopieren</button>
       ${st.me.seat != null ? '<button class="btn" data-act="leaveSeat">🚶 Aufstehen (Bot übernimmt)</button>' : ''}
@@ -836,6 +852,7 @@ $('#modal').addEventListener('click', async (e) => {
       break;
     }
     case 'fullscreen': toggleFullscreen(); closeModal(); break;
+    case 'figures': store.set('kd-figures', figuresOn() ? '0' : '1'); updateFigures(); S.modalHtml = ''; renderModal(); break;
     case 'voice': {
       const cur = store.get('kd-voice') || null;
       const next = VOICE_OPTIONS[(VOICE_OPTIONS.findIndex(([k]) => k === cur) + 1) % VOICE_OPTIONS.length][0];
