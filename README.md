@@ -73,7 +73,8 @@ mit Nano Banana generiertes Motiv. Details: [public/cards/CREDITS.md](public/car
 
 ## Bedienung
 
-- **Karte spielen:** anklicken (Touch: antippen zum Anheben, nochmal antippen zum Spielen). Nicht erlaubte Karten sind abgedunkelt.
+- **Karte spielen:** anklicken. Tablet/Handy: waagerecht über die Hand wischen hebt die Karte unter dem Finger an,
+  nach oben wischen spielt sie (oder: antippen zum Anheben, nochmal antippen zum Spielen). Nicht erlaubte Karten sind abgedunkelt.
 - **Ansagen:** erscheinen als Knöpfe über der Hand, solange sie zeitlich noch erlaubt sind.
 - **Oben rechts:** Voice/Video, Mikro/Kamera, letzter Stich, Spielstand, Regeln, Chat, Ton, Menü.
 - **Verbindung weg?** Einfach neu laden – der Platz bleibt erhalten, bis dahin spielt ein Bot. Zuschauer können
