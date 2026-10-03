@@ -3,7 +3,7 @@
 export const RULE_DEFS = [
   { key: 'mitNeunen', group: 'Grundregeln', type: 'bool', def: true,
     label: 'Mit Neunen', help: '48 Karten (12 pro Spieler). Ohne Neunen: 40 Karten, 10 pro Spieler.' },
-  { key: 'dullen', group: 'Grundregeln', type: 'select', def: 'zweite',
+  { key: 'dullen', group: 'Grundregeln', type: 'select', def: 'erste',
     label: 'Dullen (Herz-10)', help: 'Die Herz-Zehnen sind die höchsten Trümpfe. Welche sticht bei Gleichstand?',
     options: [
       ['zweite', 'Zweite sticht die erste'],

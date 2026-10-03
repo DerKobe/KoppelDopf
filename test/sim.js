@@ -8,7 +8,10 @@ import { buildDeck, makeTrumpContext, trickWinnerIndex, legalCards } from '../sh
 // --- gezielte Regeltests ---
 {
   const r = defaultRules();
-  const ctx = makeTrumpContext('D', r);
+  // Standard: erste Dulle sticht die zweite
+  assert.equal(r.dullen, 'erste');
+  assert.equal(trickWinnerIndex(makeTrumpContext('D', r), [{ seat: 0, card: 'H10a' }, { seat: 1, card: 'H10b' }, { seat: 2, card: 'CQa' }, { seat: 3, card: 'D9a' }], false), 0);
+  const ctx = makeTrumpContext('D', { ...r, dullen: 'zweite' });
   // zweite Dulle sticht die erste
   assert.equal(trickWinnerIndex(ctx, [{ seat: 0, card: 'H10a' }, { seat: 1, card: 'H10b' }, { seat: 2, card: 'CQa' }, { seat: 3, card: 'D9a' }], false), 1);
   const ctx2 = makeTrumpContext('D', { ...r, dullen: 'zweite_ausser_letzter' });
