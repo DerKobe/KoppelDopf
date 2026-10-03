@@ -98,9 +98,17 @@ export class TableScene {
     this.raycaster = new THREE.Raycaster();
     this.pointer = new THREE.Vector2(-9, -9);
     const el = this.renderer.domElement;
-    el.addEventListener('pointermove', (e) => { this.setPointer(e); if (e.pointerType !== 'touch') this.updateHover(); });
-    el.addEventListener('pointerleave', () => { if (this.hovered) { this.hovered = null; this.layoutHand(); } });
+    this.gesture = null; // laufende Finger-/Stift-Geste (Touch)
+    el.addEventListener('pointerdown', (e) => this.onPointerDown(e));
+    el.addEventListener('pointermove', (e) => {
+      this.setPointer(e);
+      if (this.gesture) this.onGestureMove(e);
+      else if (e.pointerType === 'mouse' || (e.pointerType === 'pen' && !e.buttons)) this.updateHover();
+    });
+    // Touch-Pointer „verlassen“ das Element bei jedem Abheben – das darf die angetippte Karte nicht wieder absenken
+    el.addEventListener('pointerleave', (e) => { if (e.pointerType === 'mouse' && this.hovered) { this.hovered = null; this.layoutHand(); } });
     el.addEventListener('pointerup', (e) => this.onPointerUp(e));
+    el.addEventListener('pointercancel', () => { this.gesture = null; });
 
     this.clock = new THREE.Clock();
     window.addEventListener('resize', () => this.resize());
@@ -538,12 +546,69 @@ export class TableScene {
     }
   }
 
-  onPointerUp(e) {
+  // ---------- Touch-Gesten ----------
+  // Waagerecht über die Hand wischen: die Karte unter dem Finger hebt sich (wie Mouse-Hover).
+  // Nach oben wischen: die angehobene bzw. berührte Karte wird gespielt (Armut: aus-/abgewählt).
+  // Antippen bleibt wie bisher: einmal anheben, nochmal spielen.
+  onPointerDown(e) {
+    if (e.pointerType === 'mouse') return;
     this.setPointer(e);
     const id = this.pick();
+    this.gesture = { x0: e.clientX, y0: e.clientY, low: e.clientY, mode: 'tap', card: id };
+    try { this.renderer.domElement.setPointerCapture(e.pointerId); } catch {}
+  }
+
+  onGestureMove(e) {
+    const g = this.gesture;
+    if (g.mode === 'done') return;
+    const dx = e.clientX - g.x0, dy = e.clientY - g.y0;
+    const playDist = Math.max(40, window.innerHeight * 0.06);
+    if (g.mode === 'tap') {
+      if (Math.hypot(dx, dy) < 12) return;
+      if (Math.abs(dx) > Math.abs(dy)) g.mode = 'scrub';
+      else if (dy < 0 && (g.card || this.hovered)) { g.mode = 'swipe'; g.card = g.card || this.hovered; }
+      else { g.mode = 'done'; return; } // nach unten / ins Leere: nichts tun
+    }
+    if (g.mode === 'scrub') {
+      const id = this.pick();
+      if (id && id !== this.hovered) { this.hovered = id; this.layoutHand(); }
+      // aus dem Wischen heraus nach oben ziehen spielt die gerade angehobene Karte
+      g.low = Math.max(g.low, e.clientY);
+      if (this.hovered && g.low - e.clientY > playDist) { g.card = this.hovered; this.commitGesture(); }
+      return;
+    }
+    if (g.mode === 'swipe') {
+      if (this.hovered !== g.card) { this.hovered = g.card; this.layoutHand(); }
+      if (g.y0 - e.clientY > playDist) this.commitGesture();
+    }
+  }
+
+  commitGesture() {
+    const id = this.gesture.card;
+    this.gesture.mode = 'done';
+    if (!id || !this.hand.has(id)) return;
+    if (this.selectMode) {
+      if (this.selected.has(id)) this.selected.delete(id);
+      else this.selected.add(id);
+      this.layoutHand();
+      this.cb.onSelectionChange?.([...this.selected]);
+      return;
+    }
+    if (this.myTurn && this.playable.has(id)) this.cb.onPlay?.(id);
+    else if (this.myTurn) this.cb.onIllegal?.(id);
+  }
+
+  onPointerUp(e) {
+    this.setPointer(e);
+    if (e.pointerType !== 'mouse') {
+      const g = this.gesture;
+      this.gesture = null;
+      if (g && g.mode !== 'tap') return; // Wischgeste schon ausgewertet (beim Wischen bleibt die Karte angehoben)
+    }
+    const id = this.pick();
     if (!id && this.pickLastTrickPile()) { this.cb.onLastTrick?.(); return; }
-    if (!id) { if (e.pointerType === 'touch' && this.hovered) { this.hovered = null; this.layoutHand(); } return; }
-    if (e.pointerType === 'touch' && this.hovered !== id && !this.selectMode) {
+    if (!id) { if (e.pointerType !== 'mouse' && this.hovered) { this.hovered = null; this.layoutHand(); } return; }
+    if (e.pointerType !== 'mouse' && this.hovered !== id && !this.selectMode) {
       // Touch: erstes Antippen hebt die Karte an, zweites spielt sie
       this.hovered = id;
       this.layoutHand();
